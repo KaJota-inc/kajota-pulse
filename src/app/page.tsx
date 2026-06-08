@@ -1,63 +1,103 @@
-import Image from "next/image";
+/**
+ * Kajota Pulse — landing page.
+ *
+ * Standalone entry point that introduces Pulse and links into the
+ * dashboard. Designed to be the first thing a hackathon judge sees, so
+ * the elevator pitch is above the fold and the live demo is one click
+ * away.
+ */
+import Link from 'next/link';
 
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <div className="min-h-screen bg-gradient-to-b from-orange-50 to-white">
+      <main className="mx-auto max-w-5xl px-6 py-20 sm:py-32">
+        {/* Brand row */}
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-500 text-white">
+            <svg
+              aria-hidden
+              className="h-5 w-5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2.5}
+              viewBox="0 0 24 24"
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+              <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+          <span className="text-lg font-bold text-orange-600">Kajota Pulse</span>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+
+        {/* Hero */}
+        <h1 className="mt-12 max-w-3xl text-5xl font-extrabold leading-tight text-zinc-900 sm:text-6xl">
+          The Bloomberg terminal for African micro-commerce.
+        </h1>
+        <p className="mt-6 max-w-2xl text-xl leading-8 text-zinc-600">
+          Real-time pricing intelligence for co-sellers — trending products, price movements,
+          competitor inventory, and high-margin opportunities at a glance.
+        </p>
+
+        {/* CTA */}
+        <div className="mt-10 flex flex-wrap gap-4">
+          <Link
+            className="rounded-full bg-orange-600 px-8 py-4 text-lg font-semibold text-white shadow-lg shadow-orange-200 transition-colors hover:bg-orange-700"
+            href="/dashboard"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
+            Open the dashboard →
+          </Link>
           <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
+            className="rounded-full border border-zinc-300 bg-white px-8 py-4 text-lg font-semibold text-zinc-700 transition-colors hover:bg-zinc-50"
+            href="https://github.com/KaJota-inc/kajota-pulse"
             rel="noopener noreferrer"
+            target="_blank"
           >
-            Documentation
+            View on GitHub
           </a>
+        </div>
+
+        {/* Feature grid */}
+        <div className="mt-24 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            {
+              title: 'Trending',
+              body: 'Top movers by velocity, favorites, and share-clicks in the last 24 hours.',
+            },
+            {
+              title: 'Price waterfall',
+              body: 'Your listed price vs. category median vs. lowest competitor.',
+            },
+            {
+              title: 'Stock alerts',
+              body: 'Notified the moment competitor inventory in your category goes out of stock.',
+            },
+            {
+              title: 'Margin leaderboard',
+              body: 'Categories ranked by realised co-sell markup — find the highest-yield slots.',
+            },
+          ].map(f => (
+            <div
+              key={f.title}
+              className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm"
+            >
+              <h3 className="text-base font-bold text-zinc-900">{f.title}</h3>
+              <p className="mt-2 text-sm leading-6 text-zinc-600">{f.body}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Stack credit */}
+        <div className="mt-20 rounded-2xl bg-orange-50/60 p-8">
+          <h3 className="text-base font-bold text-orange-900">Stack</h3>
+          <p className="mt-2 text-sm leading-6 text-orange-900/80">
+            Next.js 16 (Vercel) · UI generated by Vercel v0 · AWS Aurora Serverless v2 (Postgres) ·
+            AWS Lambda + EventBridge for ingestion · MongoDB Atlas (Kajota source of truth).
+          </p>
+          <p className="mt-2 text-sm leading-6 text-orange-900/80">
+            Sibling apps:{' '}
+            <span className="font-semibold">Kajota Coach</span> (AI listing drafter) ·{' '}
+            <span className="font-semibold">Kajota Mesh</span> (on-chain co-sell settlement).
+          </p>
         </div>
       </main>
     </div>
