@@ -37,6 +37,15 @@ import type {
 
 let cachedClient: RDSDataClient | null = null;
 
+/**
+ * True when the Aurora env vars are present, i.e. the dashboard should
+ * try real data instead of the W1 mock. Lets the page auto-switch the
+ * moment env vars land on Vercel — no code change required.
+ */
+export function isAuroraConfigured(): boolean {
+  return Boolean(process.env.AURORA_RESOURCE_ARN && process.env.AURORA_SECRET_ARN);
+}
+
 function client(): RDSDataClient {
   if (cachedClient) return cachedClient;
   if (!process.env.AURORA_RESOURCE_ARN || !process.env.AURORA_SECRET_ARN) {

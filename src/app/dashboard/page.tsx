@@ -1,26 +1,27 @@
 /**
  * Kajota Pulse — main dashboard.
  *
- * Day-1 skeleton: 4 cards matching the views in README §"Day-1 dashboard
- * views" (Trending, Price waterfall, Stock alerts, Margin leaderboard).
- * Data is currently mocked so the layout + interactions can be developed
- * independently of the AWS ingestion pipeline. Real data lands in W2
- * once the Aurora schema + Lambda are wired (see `docs/architecture.md`).
+ * 4 cards matching the views in README §"Day-1 dashboard views"
+ * (Trending, Price waterfall, Stock alerts, Margin leaderboard).
  *
- * Vercel v0 generations will replace each card body once the v0 project
- * is set up — the surrounding shell here is intentionally minimal so
- * those generations slot in without rework.
+ * Data source auto-switches via `loadDashboard()`: real Aurora data
+ * when the AURORA_* env vars are configured + reachable, otherwise the
+ * polished W1 mock. No code change needed when the cluster comes
+ * online — the cards just start showing live numbers. The header badge
+ * reports which source served the current view.
  */
 import { TrendingCard } from '@/components/pulse/TrendingCard';
 import { PriceWaterfallCard } from '@/components/pulse/PriceWaterfallCard';
 import { StockAlertsCard } from '@/components/pulse/StockAlertsCard';
 import { MarginLeaderboardCard } from '@/components/pulse/MarginLeaderboardCard';
-import { getMockDashboardData } from '@/lib/mock';
+import { loadDashboard } from '@/lib/data';
 
-export default function DashboardPage() {
-  // Mock data for W1 — replaced with `getDashboardData(sellerId)` once
-  // the Aurora schema + Lambda ingestion (W2) land.
-  const data = getMockDashboardData();
+// Always render fresh — the data source decision + live numbers must
+// not be cached at build time.
+export const dynamic = 'force-dynamic';
+
+export default async function DashboardPage() {
+  const { data, source } = await loadDashboard();
 
   return (
     <div className="min-h-screen bg-zinc-50">
@@ -41,9 +42,17 @@ export default function DashboardPage() {
             </div>
             <span className="text-base font-bold text-zinc-900">Kajota Pulse</span>
           </div>
-          <span className="text-sm text-zinc-500">
-            Mock data · live ingestion lands W2
-          </span>
+          {source === 'aurora' ? (
+            <span className="flex items-center gap-1.5 text-sm text-emerald-600">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              Live · Aurora
+            </span>
+          ) : (
+            <span className="flex items-center gap-1.5 text-sm text-zinc-500">
+              <span className="h-2 w-2 rounded-full bg-zinc-400" />
+              Mock data · Aurora not yet configured
+            </span>
+          )}
         </div>
       </header>
 
