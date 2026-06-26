@@ -1,26 +1,17 @@
 /**
- * Aurora Serverless v2 (Postgres) client via the AWS RDS Data API.
+ * Postgres data layer (direct connection via `pg`).
  *
- * Why the Data API and not a regular Postgres driver?
- *   - Vercel Functions can't open persistent VPC connections.
- *   - Data API speaks plain HTTPS, scales with the function, and
- *     auto-resumes the cluster when it's paused.
+ * The Pulse cluster is Aurora Serverless v2 with the simplified
+ * internet-access-gateway networking model, so it's reachable over a
+ * normal TLS Postgres connection — no RDS Data API, no Secrets Manager,
+ * no AWS credentials in the Vercel runtime. Just `DATABASE_URL`.
  *
- * Configuration (env vars):
- *   AURORA_RESOURCE_ARN   the cluster ARN
- *   AURORA_SECRET_ARN     the Secrets Manager ARN with the DB password
- *   AURORA_DATABASE       the database name (default: pulse)
- *   AWS_REGION            standard AWS SDK env
- *   AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY  standard AWS creds
+ * Configuration (env var):
+ *   DATABASE_URL = postgresql://postgres:<pw>@pulse.cluster-xxxx.eu-west-1.rds.amazonaws.com:5432/postgres?sslmode=require
  *
  * Schema lives in `docs/schema.sql`.
  */
-import {
-  ExecuteStatementCommand,
-  type ExecuteStatementCommandInput,
-  type Field,
-  RDSDataClient,
-} from '@aws-sdk/client-rds-data';
+import { Pool, type PoolClient, type QueryResultRow } from 'pg';
 
 import type {
   DashboardData,
@@ -32,68 +23,57 @@ import type {
 } from './types';
 
 // ---------------------------------------------------------------------
-//  Client construction (lazy — first call wins)
+//  Pool (lazy singleton — survives warm serverless invocations)
 // ---------------------------------------------------------------------
 
-let cachedClient: RDSDataClient | null = null;
+let pool: Pool | null = null;
 
 /**
- * True when the Aurora env vars are present, i.e. the dashboard should
- * try real data instead of the W1 mock. Lets the page auto-switch the
- * moment env vars land on Vercel — no code change required.
+ * True when DATABASE_URL is present, i.e. the dashboard should try real
+ * data instead of the mock. Lets the page auto-switch the moment the
+ * env var lands on Vercel — no code change required.
  */
-export function isAuroraConfigured(): boolean {
-  return Boolean(process.env.AURORA_RESOURCE_ARN && process.env.AURORA_SECRET_ARN);
+export function isDbConfigured(): boolean {
+  return Boolean(process.env.DATABASE_URL);
 }
 
-function client(): RDSDataClient {
-  if (cachedClient) return cachedClient;
-  if (!process.env.AURORA_RESOURCE_ARN || !process.env.AURORA_SECRET_ARN) {
-    throw new Error(
-      'AURORA_RESOURCE_ARN and AURORA_SECRET_ARN must be set. See docs/aws-setup.md.',
-    );
+function getPool(): Pool {
+  if (pool) return pool;
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    throw new Error('DATABASE_URL is not set. See docs/provisioning-checklist.md.');
   }
-  cachedClient = new RDSDataClient({});
-  return cachedClient;
-}
-
-/**
- * Execute a parameterised SQL statement against Aurora. Returns the
- * raw rows (each row = array of Field). Caller is responsible for
- * decoding into typed shapes.
- */
-async function exec(
-  sql: string,
-  parameters: ExecuteStatementCommandInput['parameters'] = [],
-): Promise<Field[][]> {
-  const cmd = new ExecuteStatementCommand({
-    resourceArn: process.env.AURORA_RESOURCE_ARN!,
-    secretArn: process.env.AURORA_SECRET_ARN!,
-    database: process.env.AURORA_DATABASE ?? 'pulse',
-    sql,
-    parameters,
-    includeResultMetadata: false,
+  pool = new Pool({
+    connectionString,
+    // Aurora requires TLS. We don't pin the RDS CA here (demo-grade);
+    // for production, load the rds-combined-ca-bundle and set
+    // rejectUnauthorized: true.
+    ssl: { rejectUnauthorized: false },
+    // Serverless: keep the footprint tiny. One connection per warm
+    // instance is plenty for dashboard read traffic.
+    max: 2,
+    idleTimeoutMillis: 10_000,
+    connectionTimeoutMillis: 8_000,
   });
-  const out = await client().send(cmd);
-  return out.records ?? [];
+  return pool;
 }
 
-/** Tiny helpers for building parameters concisely. */
-const p = {
-  s: (name: string, value: string) => ({ name, value: { stringValue: value } }),
-  n: (name: string, value: number) => ({ name, value: { doubleValue: value } }),
-  i: (name: string, value: number) => ({ name, value: { longValue: value } }),
-};
+async function query<T extends QueryResultRow = QueryResultRow>(
+  sql: string,
+  params: unknown[] = [],
+): Promise<T[]> {
+  const res = await getPool().query<T>(sql, params);
+  return res.rows;
+}
 
-/** Decode a Field into a primitive (best-effort). */
-function pickValue(f: Field | undefined): string | number | null {
-  if (!f) return null;
-  if (f.isNull) return null;
-  if (f.stringValue != null) return f.stringValue;
-  if (f.longValue != null) return f.longValue;
-  if (f.doubleValue != null) return f.doubleValue;
-  if (f.booleanValue != null) return f.booleanValue ? 1 : 0;
-  return null;
+/** Run several statements on one checked-out client (used by ingestion). */
+async function withClient<T>(fn: (c: PoolClient) => Promise<T>): Promise<T> {
+  const client = await getPool().connect();
+  try {
+    return await fn(client);
+  } finally {
+    client.release();
+  }
 }
 
 // ---------------------------------------------------------------------
@@ -101,8 +81,8 @@ function pickValue(f: Field | undefined): string | number | null {
 // ---------------------------------------------------------------------
 
 /**
- * Top entry-point for the dashboard page. Returns all 4 cards' data in
- * one round-trip per card. Replaces the W1 mock in `lib/mock.ts`.
+ * Top entry-point for the dashboard page. Returns all 4 cards' data.
+ * Replaces the W1 mock in `lib/mock.ts` (via `lib/data.ts`).
  */
 export async function getDashboardData(sellerId?: string): Promise<DashboardData> {
   const [trending, priceWaterfall, stockAlerts, marginLeaderboard] = await Promise.all([
@@ -114,8 +94,21 @@ export async function getDashboardData(sellerId?: string): Promise<DashboardData
   return { trending, priceWaterfall, stockAlerts, marginLeaderboard };
 }
 
+interface TrendingRow {
+  product_id: string;
+  name: string;
+  currency: string;
+  price: string;
+  category_id: string | null;
+  store_id: string | null;
+  favorites_delta: string;
+  shares_delta: string;
+  velocity_delta: string;
+  score: string;
+}
+
 async function queryTrending(): Promise<TrendingEntry[]> {
-  const rows = await exec(
+  const rows = await query<TrendingRow>(
     `SELECT product_id, name, currency, price, category_id, store_id,
             favorites_delta, shares_delta, velocity_delta,
             (favorites_delta + shares_delta + velocity_delta) AS score
@@ -124,72 +117,96 @@ async function queryTrending(): Promise<TrendingEntry[]> {
       LIMIT 5`,
   );
   return rows.map(r => {
-    const fav = (pickValue(r[6]) as number) ?? 0;
-    const sh = (pickValue(r[7]) as number) ?? 0;
-    const vel = (pickValue(r[8]) as number) ?? 0;
     const product: PulseProduct = {
-      id: String(pickValue(r[0]) ?? ''),
-      name: String(pickValue(r[1]) ?? ''),
-      currency: String(pickValue(r[2]) ?? 'NGN'),
-      price: Number(pickValue(r[3]) ?? 0),
-      categoryId: pickValue(r[4]) as string | null,
-      storeId: pickValue(r[5]) as string | null,
+      id: r.product_id,
+      name: r.name,
+      currency: r.currency ?? 'NGN',
+      price: Number(r.price ?? 0),
+      categoryId: r.category_id,
+      storeId: r.store_id,
       stockStatus: 'UNKNOWN',
     };
     return {
       product,
-      score: Number(pickValue(r[9]) ?? 0),
-      signals: { favoritesDelta: fav, sharesDelta: sh, velocityDelta: vel },
+      score: Number(r.score ?? 0),
+      signals: {
+        favoritesDelta: Number(r.favorites_delta ?? 0),
+        sharesDelta: Number(r.shares_delta ?? 0),
+        velocityDelta: Number(r.velocity_delta ?? 0),
+      },
     };
   });
 }
 
+interface WaterfallRow {
+  category: string;
+  currency: string;
+  lowest: string;
+  median: string;
+  your_price: string | null;
+}
+
 async function queryPriceWaterfall(sellerId?: string): Promise<PriceWaterfallRow[]> {
-  const rows = await exec(
+  const rows = await query<WaterfallRow>(
     `SELECT
-        COALESCE(category_id, 'Uncategorised') AS category,
+        COALESCE(category_id, 'Uncategorised')                      AS category,
         currency,
-        MIN(price) AS lowest,
-        percentile_cont(0.5) WITHIN GROUP (ORDER BY price) AS median,
-        MAX(CASE WHEN store_id = :sellerId THEN price END) AS your_price
+        MIN(price)                                                 AS lowest,
+        percentile_cont(0.5) WITHIN GROUP (ORDER BY price)         AS median,
+        MAX(CASE WHEN store_id = $1 THEN price END)                AS your_price
       FROM products
      GROUP BY category_id, currency
      ORDER BY median DESC
      LIMIT 8`,
-    [p.s('sellerId', sellerId ?? '')],
+    [sellerId ?? ''],
   );
   return rows.map(r => ({
-    category: String(pickValue(r[0]) ?? ''),
-    currency: String(pickValue(r[1]) ?? 'NGN'),
-    lowestCompetitor: Number(pickValue(r[2]) ?? 0),
-    median: Number(pickValue(r[3]) ?? 0),
-    yourPrice: pickValue(r[4]) == null ? null : Number(pickValue(r[4])),
+    category: r.category,
+    currency: r.currency ?? 'NGN',
+    lowestCompetitor: Number(r.lowest ?? 0),
+    median: Number(r.median ?? 0),
+    yourPrice: r.your_price == null ? null : Number(r.your_price),
   }));
 }
 
+interface StockRow {
+  product_id: string;
+  name: string;
+  category_id: string | null;
+  store_id: string | null;
+  captured_at: string;
+}
+
 async function queryStockAlerts(sellerId?: string): Promise<StockAlert[]> {
-  const rows = await exec(
+  const rows = await query<StockRow>(
     `SELECT s.product_id, p.name, p.category_id, p.store_id, s.captured_at
        FROM v_latest_stock s
        JOIN products p ON p.id = s.product_id
       WHERE s.stock_status = 'OUT_OF_STOCK'
         AND s.captured_at > now() - interval '24 hours'
-        AND (:sellerId = '' OR p.store_id != :sellerId)
+        AND ($1 = '' OR p.store_id IS DISTINCT FROM $1)
       ORDER BY s.captured_at DESC
       LIMIT 10`,
-    [p.s('sellerId', sellerId ?? '')],
+    [sellerId ?? ''],
   );
   return rows.map(r => ({
-    id: String(pickValue(r[0]) ?? ''),
-    productName: String(pickValue(r[1]) ?? ''),
-    category: String(pickValue(r[2]) ?? 'Uncategorised'),
-    competitorStoreName: String(pickValue(r[3]) ?? 'Unknown store'),
-    detectedAt: String(pickValue(r[4]) ?? ''),
+    id: r.product_id,
+    productName: r.name,
+    category: r.category_id ?? 'Uncategorised',
+    competitorStoreName: r.store_id ?? 'Unknown store',
+    detectedAt: new Date(r.captured_at).toISOString(),
   }));
 }
 
+interface MarginRow {
+  category: string;
+  avg_markup: string;
+  cosell_count: string;
+  currency: string;
+}
+
 async function queryMarginLeaderboard(): Promise<MarginLeaderboardRow[]> {
-  const rows = await exec(
+  const rows = await query<MarginRow>(
     `SELECT
         COALESCE(p.category_id, 'Uncategorised') AS category,
         AVG(c.markup_pct)                        AS avg_markup,
@@ -204,10 +221,10 @@ async function queryMarginLeaderboard(): Promise<MarginLeaderboardRow[]> {
       LIMIT 5`,
   );
   return rows.map(r => ({
-    category: String(pickValue(r[0]) ?? ''),
-    realisedMarkupPct: Number(pickValue(r[1]) ?? 0),
-    cosellCount: Number(pickValue(r[2]) ?? 0),
-    currency: String(pickValue(r[3]) ?? 'NGN'),
+    category: r.category,
+    realisedMarkupPct: Number(r.avg_markup ?? 0),
+    cosellCount: Number(r.cosell_count ?? 0),
+    currency: r.currency ?? 'NGN',
   }));
 }
 
@@ -215,14 +232,10 @@ async function queryMarginLeaderboard(): Promise<MarginLeaderboardRow[]> {
 //  Write-side — ingestion (called from /api/ingest)
 // ---------------------------------------------------------------------
 
-/**
- * Upsert a product row. Called when a Mongo `products` change-event
- * arrives. Idempotent: re-running with the same id is safe.
- */
 export async function upsertProduct(prod: PulseProduct): Promise<void> {
-  await exec(
+  await query(
     `INSERT INTO products (id, name, currency, price, category_id, store_id, stock_status, last_synced_at)
-        VALUES (:id, :name, :currency, :price, :categoryId, :storeId, :stockStatus, now())
+        VALUES ($1, $2, $3, $4, $5, $6, $7, now())
      ON CONFLICT (id) DO UPDATE SET
         name           = EXCLUDED.name,
         currency       = EXCLUDED.currency,
@@ -232,72 +245,54 @@ export async function upsertProduct(prod: PulseProduct): Promise<void> {
         stock_status   = EXCLUDED.stock_status,
         last_synced_at = now()`,
     [
-      p.s('id', prod.id),
-      p.s('name', prod.name),
-      p.s('currency', prod.currency),
-      p.n('price', prod.price),
-      prod.categoryId ? p.s('categoryId', prod.categoryId) : { name: 'categoryId', value: { isNull: true } },
-      prod.storeId ? p.s('storeId', prod.storeId) : { name: 'storeId', value: { isNull: true } },
-      p.s('stockStatus', prod.stockStatus),
+      prod.id,
+      prod.name,
+      prod.currency,
+      prod.price,
+      prod.categoryId,
+      prod.storeId,
+      prod.stockStatus,
     ],
   );
 }
 
-/**
- * Append a price snapshot. Always called when product.price changes.
- * Powers the trending velocity signal + waterfall historical context.
- */
 export async function recordPriceSnapshot(
   productId: string,
   price: number,
   currency: string,
 ): Promise<void> {
-  await exec(
+  await query(
     `INSERT INTO price_snapshots (product_id, price, currency)
-        VALUES (:productId, :price, :currency)
+        VALUES ($1, $2, $3)
      ON CONFLICT DO NOTHING`,
-    [p.s('productId', productId), p.n('price', price), p.s('currency', currency)],
+    [productId, price, currency],
   );
 }
 
-/**
- * Append a stock transition. Used by the StockAlerts card.
- */
 export async function recordStockEvent(
   productId: string,
   stockStatus: 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK',
 ): Promise<void> {
-  await exec(
+  await query(
     `INSERT INTO stock_events (product_id, stock_status)
-        VALUES (:productId, :stockStatus)
+        VALUES ($1, $2)
      ON CONFLICT DO NOTHING`,
-    [p.s('productId', productId), p.s('stockStatus', stockStatus)],
+    [productId, stockStatus],
   );
 }
 
-/**
- * Append an engagement signal (favorite / share / view / cosell_create).
- * Drives the trending composite score.
- */
 export async function recordEngagement(
   productId: string,
   kind: 'favorite' | 'share' | 'view' | 'cosell_create',
   actorId?: string,
 ): Promise<void> {
-  await exec(
+  await query(
     `INSERT INTO engagement_events (product_id, kind, actor_id)
-        VALUES (:productId, :kind, :actorId)`,
-    [
-      p.s('productId', productId),
-      p.s('kind', kind),
-      actorId ? p.s('actorId', actorId) : { name: 'actorId', value: { isNull: true } },
-    ],
+        VALUES ($1, $2, $3)`,
+    [productId, kind, actorId ?? null],
   );
 }
 
-/**
- * Upsert a co-sell listing row. Called on cosellproducts change events.
- */
 export async function upsertCosellListing(args: {
   id: string;
   productId: string;
@@ -306,20 +301,15 @@ export async function upsertCosellListing(args: {
   markedUpPrice: number;
   isActive: boolean;
 }): Promise<void> {
-  await exec(
+  await query(
     `INSERT INTO cosell_listings (id, product_id, seller_id, markup_pct, marked_up_price, is_active)
-        VALUES (:id, :productId, :sellerId, :markupPct, :markedUpPrice, :isActive)
+        VALUES ($1, $2, $3, $4, $5, $6)
      ON CONFLICT (id) DO UPDATE SET
         markup_pct      = EXCLUDED.markup_pct,
         marked_up_price = EXCLUDED.marked_up_price,
         is_active       = EXCLUDED.is_active`,
-    [
-      p.s('id', args.id),
-      p.s('productId', args.productId),
-      p.s('sellerId', args.sellerId),
-      p.n('markupPct', args.markupPct),
-      p.n('markedUpPrice', args.markedUpPrice),
-      { name: 'isActive', value: { booleanValue: args.isActive } },
-    ],
+    [args.id, args.productId, args.sellerId, args.markupPct, args.markedUpPrice, args.isActive],
   );
 }
+
+export { withClient };

@@ -1,82 +1,84 @@
 /**
- * apply-schema.mjs — apply docs/schema.sql to the Aurora cluster via the
- * RDS Data API. Run once after the cluster reaches "Available" and you've
- * captured the two ARNs.
+ * apply-schema.mjs — apply docs/schema.sql to the Pulse Postgres cluster
+ * over a direct `pg` connection. Run once after the cluster is up.
  *
- * Usage:
- *   export AURORA_RESOURCE_ARN="arn:aws:rds:eu-west-1:...:cluster:pulse"
- *   export AURORA_SECRET_ARN="arn:aws:secretsmanager:eu-west-1:...:secret:rds!cluster-..."
- *   export AURORA_DATABASE="pulse"
- *   export AWS_REGION="eu-west-1"
- *   export AWS_ACCESS_KEY_ID="..."
- *   export AWS_SECRET_ACCESS_KEY="..."
+ * Reads DATABASE_URL from the environment, or from a local `.env.local`
+ * file in the repo root (gitignored — the password never enters git or
+ * any chat transcript).
+ *
+ *   .env.local:
+ *     DATABASE_URL=postgresql://postgres:<pw>@pulse.cluster-xxxx.eu-west-1.rds.amazonaws.com:5432/postgres?sslmode=require
+ *
  *   node scripts/apply-schema.mjs
  *
- * Reuses @aws-sdk/client-rds-data (already a project dependency).
+ * Uses `pg` (already a project dependency). The connection string —
+ * which contains the password — is never logged.
  */
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import {
-  ExecuteStatementCommand,
-  RDSDataClient,
-} from '@aws-sdk/client-rds-data';
+import pg from 'pg';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const schemaPath = join(here, '..', 'docs', 'schema.sql');
+const repoRoot = join(here, '..');
 
-const resourceArn = process.env.AURORA_RESOURCE_ARN;
-const secretArn = process.env.AURORA_SECRET_ARN;
-const database = process.env.AURORA_DATABASE ?? 'pulse';
+// --- resolve DATABASE_URL (env first, then .env.local) ----------------
+function resolveDatabaseUrl() {
+  if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
+  try {
+    const envFile = readFileSync(join(repoRoot, '.env.local'), 'utf8');
+    for (const line of envFile.split('\n')) {
+      const m = line.match(/^\s*DATABASE_URL\s*=\s*(.+?)\s*$/);
+      if (m) return m[1].replace(/^["']|["']$/g, '');
+    }
+  } catch {
+    /* no .env.local — fall through */
+  }
+  return null;
+}
 
-if (!resourceArn || !secretArn) {
-  console.error('Set AURORA_RESOURCE_ARN and AURORA_SECRET_ARN first. See docs/aws-setup.md.');
+const connectionString = resolveDatabaseUrl();
+if (!connectionString) {
+  console.error(
+    'DATABASE_URL not found. Set it in the environment or in kajota-pulse/.env.local.',
+  );
   process.exit(1);
 }
 
-const client = new RDSDataClient({});
-
-/** Split a SQL file into individual statements, stripping line comments. */
 function splitStatements(sql) {
-  const noComments = sql.replace(/--[^\n]*/g, '');
-  return noComments
+  return sql
+    .replace(/--[^\n]*/g, '')
     .split(';')
     .map(s => s.trim())
     .filter(Boolean);
 }
 
-async function run(sql) {
-  await client.send(
-    new ExecuteStatementCommand({ resourceArn, secretArn, database, sql }),
-  );
-}
+const client = new pg.Client({
+  connectionString,
+  ssl: { rejectUnauthorized: false },
+});
 
-const statements = splitStatements(readFileSync(schemaPath, 'utf8'));
-console.log(`Applying ${statements.length} statements to "${database}" ...`);
+const statements = splitStatements(readFileSync(join(repoRoot, 'docs', 'schema.sql'), 'utf8'));
 
-for (const stmt of statements) {
-  const preview = stmt.split('\n')[0].slice(0, 64);
-  process.stdout.write(`  -> ${preview} ... `);
-  try {
-    await run(stmt);
+try {
+  await client.connect();
+  console.log(`Connected. Applying ${statements.length} statements ...`);
+  for (const stmt of statements) {
+    const preview = stmt.split('\n')[0].slice(0, 64);
+    process.stdout.write(`  -> ${preview} ... `);
+    await client.query(stmt);
     console.log('ok');
-  } catch (e) {
-    console.log('FAILED');
-    console.error(e instanceof Error ? e.message : e);
-    process.exit(1);
   }
-}
 
-console.log('\nVerifying tables ...');
-const res = await client.send(
-  new ExecuteStatementCommand({
-    resourceArn,
-    secretArn,
-    database,
-    sql: "SELECT table_name FROM information_schema.tables WHERE table_schema='public' ORDER BY table_name",
-  }),
-);
-const tables = (res.records ?? []).map(r => r[0]?.stringValue).filter(Boolean);
-console.log('Tables created:', tables.join(', ') || '(none)');
-console.log('\nDone. Next: set the 6 env vars on Vercel and flip dashboard/page.tsx to getDashboardData().');
+  const { rows } = await client.query(
+    "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE' ORDER BY table_name",
+  );
+  console.log('\nTables created:', rows.map(r => r.table_name).join(', ') || '(none)');
+  console.log('Done. Set DATABASE_URL on Vercel + redeploy → dashboard flips to live.');
+} catch (e) {
+  console.error('\nFailed:', e instanceof Error ? e.message : e);
+  process.exitCode = 1;
+} finally {
+  await client.end();
+}
