@@ -2,18 +2,18 @@
  * TrendingCard — top movers in the last 24 hours, with an
  * "Explain why" affordance per row powered by Gemini.
  *
- * Tapping the chevron next to a product's score badge POSTs to
- * /api/explain with the product + signals and renders the returned
- * natural-language explanation inline.
- *
- * The Gemini integration is the cleanest moment in Pulse where the
- * Kajota AI Stack story (Coach drafts -> Pulse monitors -> Mesh
- * settles) becomes audible to a judge in one click.
+ * Built on the shadcn/ui Card + Badge primitives (the component system
+ * Vercel v0 generates against). Tapping the chevron next to a product's
+ * score POSTs to /api/explain and renders the Gemini explanation inline.
  */
 'use client';
 
 import { useState } from 'react';
+import { ChevronRight } from 'lucide-react';
 
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 import type { TrendingEntry } from '@/lib/types';
 
 interface ExplainResponse {
@@ -32,17 +32,19 @@ function dominantSignal(e: TrendingEntry): string {
 
 export function TrendingCard({ products }: { products: TrendingEntry[] }) {
   return (
-    <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
-      <header className="mb-4 flex items-center justify-between">
-        <h2 className="text-base font-bold text-zinc-900">Trending — last 24h</h2>
-        <span className="text-xs font-medium text-zinc-500">{products.length} products</span>
-      </header>
-      <ul className="divide-y divide-zinc-100">
-        {products.map(entry => (
-          <TrendingRow entry={entry} key={entry.product.id} />
-        ))}
-      </ul>
-    </section>
+    <Card>
+      <CardHeader>
+        <CardTitle>Trending — last 24h</CardTitle>
+        <CardDescription>{products.length} products</CardDescription>
+      </CardHeader>
+      <CardContent className="pt-0">
+        <ul className="divide-y divide-border">
+          {products.map(entry => (
+            <TrendingRow entry={entry} key={entry.product.id} />
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -87,48 +89,31 @@ function TrendingRow({ entry }: { entry: TrendingEntry }) {
       <div className="flex items-center justify-between gap-3">
         <button
           aria-expanded={open}
-          className="flex-1 text-left transition-colors hover:bg-zinc-50 rounded-md -mx-1 px-1 py-1"
+          className="flex-1 rounded-md -mx-1 px-1 py-1 text-left transition-colors hover:bg-secondary"
           onClick={handleToggle}
           type="button"
         >
-          <p className="font-medium text-zinc-900">{entry.product.name}</p>
-          <p className="text-xs text-zinc-500">{dominantSignal(entry)}</p>
+          <p className="font-medium text-foreground">{entry.product.name}</p>
+          <p className="text-xs text-muted-foreground">{dominantSignal(entry)}</p>
         </button>
-        <span className="rounded-full bg-orange-50 px-3 py-1 text-sm font-bold text-orange-600">
-          {entry.score.toFixed(1)}
-        </span>
+        <Badge>{entry.score.toFixed(1)}</Badge>
         <button
           aria-label={open ? 'Hide explanation' : 'Why is this trending?'}
-          className="flex h-7 w-7 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-orange-50 hover:text-orange-600"
+          className="flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-primary"
           onClick={handleToggle}
           type="button"
         >
-          <svg
-            aria-hidden
-            className={`h-4 w-4 transition-transform ${open ? 'rotate-90' : ''}`}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2}
-            viewBox="0 0 24 24"
-          >
-            <path d="m9 18 6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+          <ChevronRight className={cn('h-4 w-4 transition-transform', open && 'rotate-90')} />
         </button>
       </div>
 
       {open && (
-        <div className="mt-2 rounded-lg bg-orange-50/60 px-3 py-2">
-          {loading && (
-            <p className="text-xs italic text-orange-900/70">Asking Gemini why…</p>
-          )}
-          {explanation && (
-            <p className="text-xs leading-5 text-orange-900">{explanation}</p>
-          )}
-          {error && <p className="text-xs text-red-700">{error}</p>}
+        <div className="mt-2 rounded-lg bg-accent px-3 py-2">
+          {loading && <p className="text-xs italic text-accent-foreground/80">Asking Gemini why…</p>}
+          {explanation && <p className="text-xs leading-5 text-accent-foreground">{explanation}</p>}
+          {error && <p className="text-xs text-destructive">{error}</p>}
           {!loading && !explanation && !error && (
-            <p className="text-xs italic text-orange-900/70">
-              Tap the chevron to ask Gemini.
-            </p>
+            <p className="text-xs italic text-accent-foreground/80">Tap the chevron to ask Gemini.</p>
           )}
         </div>
       )}

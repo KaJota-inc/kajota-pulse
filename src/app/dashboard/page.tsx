@@ -10,10 +10,13 @@
  * online — the cards just start showing live numbers. The header badge
  * reports which source served the current view.
  */
+import { Zap } from 'lucide-react';
+
 import { TrendingCard } from '@/components/pulse/TrendingCard';
 import { PriceWaterfallCard } from '@/components/pulse/PriceWaterfallCard';
 import { StockAlertsCard } from '@/components/pulse/StockAlertsCard';
 import { MarginLeaderboardCard } from '@/components/pulse/MarginLeaderboardCard';
+import { Badge } from '@/components/ui/badge';
 import { loadDashboard } from '@/lib/data';
 
 // Always render fresh — the data source decision + live numbers must
@@ -24,42 +27,35 @@ export default async function DashboardPage() {
   const { data, source } = await loadDashboard();
 
   return (
-    <div className="min-h-screen bg-zinc-50">
-      <header className="border-b border-zinc-200 bg-white">
+    <div className="min-h-screen bg-background">
+      <header className="border-b border-border bg-card">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-orange-500 text-white">
-              <svg
-                aria-hidden
-                className="h-4 w-4"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2.5}
-                viewBox="0 0 24 24"
-              >
-                <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
+              <Zap className="h-4 w-4" fill="currentColor" strokeWidth={0} />
             </div>
-            <span className="text-base font-bold text-zinc-900">Kajota Pulse</span>
+            <span className="text-base font-bold text-foreground">Kajota Pulse</span>
           </div>
           {source === 'aurora' ? (
-            <span className="flex items-center gap-1.5 text-sm text-emerald-600">
+            <Badge variant="success">
               <span className="h-2 w-2 rounded-full bg-emerald-500" />
               Live · Aurora
-            </span>
+            </Badge>
           ) : (
-            <span className="flex items-center gap-1.5 text-sm text-zinc-500">
-              <span className="h-2 w-2 rounded-full bg-zinc-400" />
+            <Badge variant="muted">
+              <span className="h-2 w-2 rounded-full bg-muted-foreground" />
               Mock data · Aurora not yet configured
-            </span>
+            </Badge>
           )}
         </div>
       </header>
 
       <main className="mx-auto max-w-7xl px-6 py-10">
         <div className="mb-8">
-          <h1 className="text-3xl font-extrabold text-zinc-900">Today&apos;s pulse</h1>
-          <p className="mt-1 text-sm text-zinc-600">
+          <h1 className="text-3xl font-extrabold tracking-tight text-foreground">
+            Today&apos;s pulse
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
             Signals collected in the last 24 hours from the Kajota catalogue.
           </p>
         </div>

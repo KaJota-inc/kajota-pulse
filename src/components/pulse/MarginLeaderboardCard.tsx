@@ -19,6 +19,7 @@ import {
   YAxis,
 } from 'recharts';
 
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import type { MarginLeaderboardRow } from '@/lib/types';
 
 const PALETTE = ['#10b981', '#22c55e', '#84cc16', '#eab308', '#f97316'];
@@ -31,12 +32,12 @@ export function MarginLeaderboardCard({ rows }: { rows: MarginLeaderboardRow[] }
   }));
 
   return (
-    <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
-      <header className="mb-4 flex items-center justify-between">
-        <h2 className="text-base font-bold text-zinc-900">Margin leaderboard</h2>
-        <span className="text-xs font-medium text-zinc-500">last 30 days</span>
-      </header>
-
+    <Card>
+      <CardHeader>
+        <CardTitle>Margin leaderboard</CardTitle>
+        <CardDescription>last 30 days</CardDescription>
+      </CardHeader>
+      <CardContent className="pt-0">
       <div className="h-[260px]">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
@@ -85,6 +86,7 @@ export function MarginLeaderboardCard({ rows }: { rows: MarginLeaderboardRow[] }
           </BarChart>
         </ResponsiveContainer>
       </div>
-    </section>
+      </CardContent>
+    </Card>
   );
 }

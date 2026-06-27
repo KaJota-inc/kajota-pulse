@@ -23,6 +23,7 @@ import {
   YAxis,
 } from 'recharts';
 
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import type { PriceWaterfallRow } from '@/lib/types';
 
 const BRAND = '#F15A32';
@@ -58,12 +59,12 @@ export function PriceWaterfallCard({ items }: { items: PriceWaterfallRow[] }) {
   const data = toChartData(items);
 
   return (
-    <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
-      <header className="mb-4 flex items-center justify-between">
-        <h2 className="text-base font-bold text-zinc-900">Price waterfall</h2>
-        <span className="text-xs font-medium text-zinc-500">vs. category median</span>
-      </header>
-
+    <Card>
+      <CardHeader>
+        <CardTitle>Price waterfall</CardTitle>
+        <CardDescription>vs. category median</CardDescription>
+      </CardHeader>
+      <CardContent className="pt-0">
       <div className="h-[260px]">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
@@ -100,10 +101,11 @@ export function PriceWaterfallCard({ items }: { items: PriceWaterfallRow[] }) {
       </div>
 
       {data.some(d => d.You == null) && (
-        <p className="mt-2 text-xs text-zinc-500">
+        <p className="mt-2 text-xs text-muted-foreground">
           Greyed bars mean you don&apos;t have a listing in that category yet.
         </p>
       )}
-    </section>
+      </CardContent>
+    </Card>
   );
 }
