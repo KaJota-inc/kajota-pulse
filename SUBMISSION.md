@@ -47,14 +47,28 @@ Pulse is the **monitor** pillar of a 3-app stack — all live:
 6. **Margin leaderboard**: categories ranked by realised co-sell markup.
 7. (Architecture beat) "Every number is a SQL query against Aurora Serverless v2, reached from Vercel with passwordless IAM tokens."
 
-## Reproduce / run
+## Reproduce / verify
+
+```bash
+node scripts/verify-live.mjs   # one-command health check of the live stack
+```
+Checks landing, the dashboard's `Live · Aurora` badge, Gemini `/api/explain`, the
+`/api/ingest` auth gate, and Aurora IAM connectivity. All 5 pass.
 
 See [`README.md`](README.md) (run locally) and [`docs/provisioning-checklist.md`](docs/provisioning-checklist.md) (stand up the AWS side). Schema: [`docs/schema.sql`](docs/schema.sql). Seed: `node scripts/seed.mjs`.
 
+**Ingestion is proven in production:** a realistic Atlas change-event POSTed to the
+live `/api/ingest` correctly upserted a `products` row + `price_snapshot` + a
+`cosell_listings` row into Aurora (verified, then cleaned up). Wiring the actual
+Atlas Triggers (`docs/atlas-trigger.js`) just points production Mongo writes at
+that proven endpoint.
+
 ## Status
 
-- ✅ Live on Vercel reading live from Aurora
-- ✅ Recharts visualisations
-- ✅ Gemini "Explain why"
-- ⬜ Optional: wire Atlas Triggers for continuous real Kajota production data (`docs/atlas-trigger.js` ready)
-- ⬜ Optional: Vercel v0 pass to regenerate cards
+- ✅ Live on Vercel reading live from Aurora (IAM-token auth)
+- ✅ shadcn/ui component system (the Vercel v0 stack) + Recharts visualisations
+- ✅ Gemini 2.5 Flash "Explain why"
+- ✅ Ingestion pipeline proven end-to-end in production
+- ✅ `scripts/verify-live.mjs` — 5/5 checks pass
+- ⬜ Optional: wire the 3 Atlas Triggers for *continuous* real production data
+- ⬜ Optional: open v0.dev to regenerate individual cards (project is v0-ready)
