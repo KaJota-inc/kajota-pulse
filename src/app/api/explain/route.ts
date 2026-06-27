@@ -100,7 +100,14 @@ export async function POST(request: Request): Promise<NextResponse> {
   const body = {
     systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
     contents: [{ role: 'user', parts: [{ text: buildUserPrompt(req) }] }],
-    generationConfig: { temperature: 0.6, maxOutputTokens: 220 },
+    generationConfig: {
+      temperature: 0.6,
+      maxOutputTokens: 320,
+      // gemini-2.5-flash enables "thinking" by default, which silently
+      // consumes the output-token budget and truncates the visible
+      // answer. We want a short, direct explanation — no thinking.
+      thinkingConfig: { thinkingBudget: 0 },
+    },
   };
 
   try {
