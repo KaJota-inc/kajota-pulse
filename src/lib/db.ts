@@ -1,16 +1,29 @@
 /**
- * Postgres data layer (direct connection via `pg`).
+ * Postgres data layer for the Pulse Aurora cluster.
  *
- * The Pulse cluster is Aurora Serverless v2 with the simplified
- * internet-access-gateway networking model, so it's reachable over a
- * normal TLS Postgres connection — no RDS Data API, no Secrets Manager,
- * no AWS credentials in the Vercel runtime. Just `DATABASE_URL`.
+ * The cluster runs the new Aurora Serverless v2 "internet-access-gateway"
+ * networking model, which *requires* IAM database authentication — static
+ * passwords are rejected (PAM). So instead of a password we mint a
+ * short-lived IAM auth token per connection via `@aws-sdk/rds-signer`.
+ * `pg` supports an async `password` callback, so every new pooled
+ * connection gets a fresh 15-minute token at handshake time. Nice
+ * security property: no long-lived DB password anywhere.
  *
- * Configuration (env var):
- *   DATABASE_URL = postgresql://postgres:<pw>@pulse.cluster-xxxx.eu-west-1.rds.amazonaws.com:5432/postgres?sslmode=require
+ * Configuration (env vars):
+ *   PULSE_DB_HOST      pulse.cluster-xxxx.eu-west-1.rds.amazonaws.com
+ *   PULSE_DB_PORT      5432            (optional, default 5432)
+ *   PULSE_DB_USER      postgres        (optional, default postgres)
+ *   PULSE_DB_NAME      postgres        (optional, default postgres)
+ *   AWS_REGION         eu-west-1
+ *   AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY  — IAM user with
+ *                      rds-db:connect on the cluster dbuser resource.
+ *
+ * Override: if DATABASE_URL is set, it's used verbatim (lets us point
+ * at a plain password-auth Postgres for local dev without code change).
  *
  * Schema lives in `docs/schema.sql`.
  */
+import { Signer } from '@aws-sdk/rds-signer';
 import { Pool, type PoolClient, type QueryResultRow } from 'pg';
 
 import type {
@@ -29,28 +42,52 @@ import type {
 let pool: Pool | null = null;
 
 /**
- * True when DATABASE_URL is present, i.e. the dashboard should try real
- * data instead of the mock. Lets the page auto-switch the moment the
- * env var lands on Vercel — no code change required.
+ * True when a DB is configured — either a direct DATABASE_URL, or the
+ * IAM-token trio (host + AWS creds). Lets the dashboard auto-switch the
+ * moment env vars land on Vercel; no code change required.
  */
 export function isDbConfigured(): boolean {
-  return Boolean(process.env.DATABASE_URL);
+  if (process.env.DATABASE_URL) return true;
+  return Boolean(process.env.PULSE_DB_HOST && process.env.AWS_ACCESS_KEY_ID);
 }
 
 function getPool(): Pool {
   if (pool) return pool;
-  const connectionString = process.env.DATABASE_URL;
-  if (!connectionString) {
-    throw new Error('DATABASE_URL is not set. See docs/provisioning-checklist.md.');
+
+  // Direct connection-string override (plain password auth).
+  if (process.env.DATABASE_URL) {
+    pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: { rejectUnauthorized: false },
+      max: 2,
+      idleTimeoutMillis: 10_000,
+      connectionTimeoutMillis: 8_000,
+    });
+    return pool;
   }
+
+  // IAM-token auth (the path this Aurora cluster requires).
+  const host = process.env.PULSE_DB_HOST;
+  if (!host) {
+    throw new Error(
+      'No database configured. Set PULSE_DB_HOST + AWS creds (or DATABASE_URL). See docs/provisioning-checklist.md.',
+    );
+  }
+  const port = Number(process.env.PULSE_DB_PORT ?? 5432);
+  const user = process.env.PULSE_DB_USER ?? 'postgres';
+  const database = process.env.PULSE_DB_NAME ?? 'postgres';
+  const region = process.env.AWS_REGION ?? 'eu-west-1';
+
+  const signer = new Signer({ hostname: host, port, username: user, region });
+
   pool = new Pool({
-    connectionString,
-    // Aurora requires TLS. We don't pin the RDS CA here (demo-grade);
-    // for production, load the rds-combined-ca-bundle and set
-    // rejectUnauthorized: true.
+    host,
+    port,
+    user,
+    database,
+    // Fresh IAM token minted at each new connection's handshake.
+    password: () => signer.getAuthToken(),
     ssl: { rejectUnauthorized: false },
-    // Serverless: keep the footprint tiny. One connection per warm
-    // instance is plenty for dashboard read traffic.
     max: 2,
     idleTimeoutMillis: 10_000,
     connectionTimeoutMillis: 8_000,

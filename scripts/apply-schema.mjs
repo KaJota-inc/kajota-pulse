@@ -1,49 +1,67 @@
 /**
- * apply-schema.mjs — apply docs/schema.sql to the Pulse Postgres cluster
- * over a direct `pg` connection. Run once after the cluster is up.
+ * apply-schema.mjs — apply docs/schema.sql to the Pulse Aurora cluster.
  *
- * Reads DATABASE_URL from the environment, or from a local `.env.local`
- * file in the repo root (gitignored — the password never enters git or
- * any chat transcript).
+ * The cluster requires IAM database authentication (internet-access-
+ * gateway model), so we mint a short-lived IAM auth token instead of
+ * using a password. Reads config from the environment or a gitignored
+ * `.env.local` in the repo root.
  *
  *   .env.local:
- *     DATABASE_URL=postgresql://postgres:<pw>@pulse.cluster-xxxx.eu-west-1.rds.amazonaws.com:5432/postgres?sslmode=require
+ *     PULSE_DB_HOST=pulse.cluster-xxxx.eu-west-1.rds.amazonaws.com
+ *     PULSE_DB_USER=postgres
+ *     PULSE_DB_NAME=postgres
+ *     AWS_REGION=eu-west-1
+ *     AWS_ACCESS_KEY_ID=...
+ *     AWS_SECRET_ACCESS_KEY=...
  *
  *   node scripts/apply-schema.mjs
  *
- * Uses `pg` (already a project dependency). The connection string —
- * which contains the password — is never logged.
+ * (If DATABASE_URL is set instead, it's used verbatim — plain password
+ * auth, for a non-IAM Postgres.)
  */
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { Signer } from '@aws-sdk/rds-signer';
 import pg from 'pg';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(here, '..');
 
-// --- resolve DATABASE_URL (env first, then .env.local) ----------------
-function resolveDatabaseUrl() {
-  if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
+// --- load .env.local into process.env (only keys not already set) -----
+function loadEnvLocal() {
   try {
-    const envFile = readFileSync(join(repoRoot, '.env.local'), 'utf8');
-    for (const line of envFile.split('\n')) {
-      const m = line.match(/^\s*DATABASE_URL\s*=\s*(.+?)\s*$/);
-      if (m) return m[1].replace(/^["']|["']$/g, '');
+    const txt = readFileSync(join(repoRoot, '.env.local'), 'utf8');
+    for (const line of txt.split('\n')) {
+      const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/);
+      if (m && !process.env[m[1]]) {
+        process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
+      }
     }
   } catch {
-    /* no .env.local — fall through */
+    /* no .env.local */
   }
-  return null;
 }
+loadEnvLocal();
 
-const connectionString = resolveDatabaseUrl();
-if (!connectionString) {
-  console.error(
-    'DATABASE_URL not found. Set it in the environment or in kajota-pulse/.env.local.',
-  );
-  process.exit(1);
+// --- build a pg client config (IAM token or DATABASE_URL) -------------
+async function buildClientConfig() {
+  if (process.env.DATABASE_URL) {
+    return { connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } };
+  }
+  const host = process.env.PULSE_DB_HOST;
+  if (!host) {
+    console.error('Set PULSE_DB_HOST + AWS creds (or DATABASE_URL) in .env.local.');
+    process.exit(1);
+  }
+  const port = Number(process.env.PULSE_DB_PORT ?? 5432);
+  const user = process.env.PULSE_DB_USER ?? 'postgres';
+  const database = process.env.PULSE_DB_NAME ?? 'postgres';
+  const region = process.env.AWS_REGION ?? 'eu-west-1';
+  const signer = new Signer({ hostname: host, port, username: user, region });
+  const token = await signer.getAuthToken();
+  return { host, port, user, database, password: token, ssl: { rejectUnauthorized: false } };
 }
 
 function splitStatements(sql) {
@@ -54,12 +72,8 @@ function splitStatements(sql) {
     .filter(Boolean);
 }
 
-const client = new pg.Client({
-  connectionString,
-  ssl: { rejectUnauthorized: false },
-});
-
 const statements = splitStatements(readFileSync(join(repoRoot, 'docs', 'schema.sql'), 'utf8'));
+const client = new pg.Client(await buildClientConfig());
 
 try {
   await client.connect();
@@ -70,12 +84,11 @@ try {
     await client.query(stmt);
     console.log('ok');
   }
-
   const { rows } = await client.query(
     "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE' ORDER BY table_name",
   );
   console.log('\nTables created:', rows.map(r => r.table_name).join(', ') || '(none)');
-  console.log('Done. Set DATABASE_URL on Vercel + redeploy → dashboard flips to live.');
+  console.log('Done. Set the same env vars on Vercel + redeploy → dashboard flips to live.');
 } catch (e) {
   console.error('\nFailed:', e instanceof Error ? e.message : e);
   process.exitCode = 1;
