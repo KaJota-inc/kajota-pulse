@@ -14,9 +14,16 @@
  *   PULSE_DB_PORT      5432            (optional, default 5432)
  *   PULSE_DB_USER      postgres        (optional, default postgres)
  *   PULSE_DB_NAME      postgres        (optional, default postgres)
- *   AWS_REGION         eu-west-1
- *   AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY  — IAM user with
- *                      rds-db:connect on the cluster dbuser resource.
+ *   PULSE_AWS_REGION   eu-west-1
+ *   PULSE_AWS_ACCESS_KEY_ID / PULSE_AWS_SECRET_ACCESS_KEY  — IAM user
+ *                      with rds-db:connect on the cluster dbuser resource.
+ *
+ * Why the PULSE_AWS_* prefix instead of the standard AWS_*: Vercel
+ * functions run on Lambda, whose runtime injects its own execution-role
+ * AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY. Those would shadow ours and
+ * the signer would mint tokens with the wrong (no-rds-db:connect) creds.
+ * Custom names + passing credentials explicitly to the Signer avoids
+ * that entirely. Falls back to AWS_* / the default chain locally.
  *
  * Override: if DATABASE_URL is set, it's used verbatim (lets us point
  * at a plain password-auth Postgres for local dev without code change).
@@ -48,7 +55,27 @@ let pool: Pool | null = null;
  */
 export function isDbConfigured(): boolean {
   if (process.env.DATABASE_URL) return true;
-  return Boolean(process.env.PULSE_DB_HOST && process.env.AWS_ACCESS_KEY_ID);
+  const hasCreds =
+    process.env.PULSE_AWS_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID;
+  return Boolean(process.env.PULSE_DB_HOST && hasCreds);
+}
+
+/**
+ * Explicit IAM credentials for the signer, preferring the PULSE_AWS_*
+ * names (Lambda-safe). Returns undefined to fall back to the SDK's
+ * default credential chain (local dev via AWS_* or a profile).
+ */
+function signerCredentials() {
+  const accessKeyId = process.env.PULSE_AWS_ACCESS_KEY_ID;
+  const secretAccessKey = process.env.PULSE_AWS_SECRET_ACCESS_KEY;
+  if (accessKeyId && secretAccessKey) {
+    return { accessKeyId, secretAccessKey };
+  }
+  return undefined;
+}
+
+function awsRegion(): string {
+  return process.env.PULSE_AWS_REGION ?? process.env.AWS_REGION ?? 'eu-west-1';
 }
 
 function getPool(): Pool {
@@ -76,9 +103,14 @@ function getPool(): Pool {
   const port = Number(process.env.PULSE_DB_PORT ?? 5432);
   const user = process.env.PULSE_DB_USER ?? 'postgres';
   const database = process.env.PULSE_DB_NAME ?? 'postgres';
-  const region = process.env.AWS_REGION ?? 'eu-west-1';
 
-  const signer = new Signer({ hostname: host, port, username: user, region });
+  const signer = new Signer({
+    hostname: host,
+    port,
+    username: user,
+    region: awsRegion(),
+    credentials: signerCredentials(),
+  });
 
   pool = new Pool({
     host,

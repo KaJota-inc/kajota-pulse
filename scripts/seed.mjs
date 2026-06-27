@@ -36,11 +36,14 @@ async function clientConfig() {
     return { connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } };
   }
   const host = process.env.PULSE_DB_HOST;
+  const accessKeyId = process.env.PULSE_AWS_ACCESS_KEY_ID ?? process.env.AWS_ACCESS_KEY_ID;
+  const secretAccessKey = process.env.PULSE_AWS_SECRET_ACCESS_KEY ?? process.env.AWS_SECRET_ACCESS_KEY;
   const signer = new Signer({
     hostname: host,
     port: Number(process.env.PULSE_DB_PORT ?? 5432),
     username: process.env.PULSE_DB_USER ?? 'postgres',
-    region: process.env.AWS_REGION ?? 'eu-west-1',
+    region: process.env.PULSE_AWS_REGION ?? process.env.AWS_REGION ?? 'eu-west-1',
+    credentials: accessKeyId && secretAccessKey ? { accessKeyId, secretAccessKey } : undefined,
   });
   return {
     host,
