@@ -54,21 +54,25 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   // -- route to the right handler by collection --
   try {
-    switch (event.ns.coll) {
-      case 'products':
-        await handleProductEvent(event);
-        return NextResponse.json({ ok: true, handled: 'product' });
-      case 'cosellproducts':
-        await handleCosellEvent(event);
-        return NextResponse.json({ ok: true, handled: 'cosell' });
-      case 'orders':
-        await handleOrderEvent(event);
-        return NextResponse.json({ ok: true, handled: 'order' });
-      default:
-        // Silently accept unknown collections — Atlas may add new
-        // triggers ahead of code rollouts.
-        return NextResponse.json({ ok: true, handled: 'ignored', coll: event.ns.coll });
+    // Normalise the collection name (lowercase, strip _ and -) so the
+    // real Kajota names — e.g. `cosell_products` in the `kajota-mobile`
+    // db — route correctly regardless of casing/separators.
+    const coll = event.ns.coll.toLowerCase().replace(/[_-]/g, '');
+    if (coll === 'products') {
+      await handleProductEvent(event);
+      return NextResponse.json({ ok: true, handled: 'product' });
     }
+    if (coll === 'cosellproducts' || coll === 'cosellproduct' || coll === 'cosellstore') {
+      await handleCosellEvent(event);
+      return NextResponse.json({ ok: true, handled: 'cosell' });
+    }
+    if (coll === 'orders' || coll === 'order') {
+      await handleOrderEvent(event);
+      return NextResponse.json({ ok: true, handled: 'order' });
+    }
+    // Silently accept unknown collections — Atlas may add new triggers
+    // ahead of code rollouts.
+    return NextResponse.json({ ok: true, handled: 'ignored', coll: event.ns.coll });
   } catch (e) {
     const message = e instanceof Error ? e.message : 'unknown';
     // Log to Vercel + still return 200 so Atlas doesn't retry-storm.
