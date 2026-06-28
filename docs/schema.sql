@@ -28,7 +28,7 @@ CREATE INDEX IF NOT EXISTS products_store_idx ON products (store_id);
 -- the trending velocity signal + price-waterfall historical context.
 -- ----------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS price_snapshots (
-    product_id    TEXT          NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    product_id    TEXT          NOT NULL,  -- no FK: ingestion is event-streamed (events arrive out of order)
     captured_at   TIMESTAMPTZ   NOT NULL DEFAULT now(),
     price         NUMERIC(12,2) NOT NULL CHECK (price >= 0),
     currency      CHAR(3)       NOT NULL,
@@ -42,7 +42,7 @@ CREATE INDEX IF NOT EXISTS price_snapshots_captured_idx ON price_snapshots (capt
 -- stock_status='OUT_OF_STOCK' AND captured_at > now() - interval '24h'`.
 -- ----------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS stock_events (
-    product_id     TEXT          NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    product_id     TEXT          NOT NULL,  -- no FK: ingestion is event-streamed
     captured_at    TIMESTAMPTZ   NOT NULL DEFAULT now(),
     stock_status   TEXT          NOT NULL
                                    CHECK (stock_status IN ('IN_STOCK','LOW_STOCK','OUT_OF_STOCK')),
@@ -56,7 +56,7 @@ CREATE INDEX IF NOT EXISTS stock_events_status_time_idx ON stock_events (stock_s
 -- ----------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS engagement_events (
     id           BIGSERIAL    PRIMARY KEY,
-    product_id   TEXT         NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    product_id   TEXT         NOT NULL,  -- no FK: ingestion is event-streamed
     kind         TEXT         NOT NULL CHECK (kind IN ('favorite','share','view','cosell_create')),
     captured_at  TIMESTAMPTZ  NOT NULL DEFAULT now(),
     actor_id     TEXT
@@ -70,7 +70,7 @@ CREATE INDEX IF NOT EXISTS engagement_events_lookup_idx
 -- ----------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS cosell_listings (
     id                 TEXT          PRIMARY KEY,
-    product_id         TEXT          NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    product_id         TEXT          NOT NULL,  -- no FK: ingestion is event-streamed
     seller_id          TEXT          NOT NULL,
     markup_pct         NUMERIC(6,2)  NOT NULL,
     marked_up_price    NUMERIC(12,2) NOT NULL,
