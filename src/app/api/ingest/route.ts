@@ -84,14 +84,14 @@ export async function POST(request: Request): Promise<NextResponse> {
 async function handleProductEvent(event: AtlasChangeEvent): Promise<void> {
   const doc = event.fullDocument;
   if (!doc) return;
-  const id = String(doc._id ?? '');
+  const id = ejsonId(doc._id);
   if (!id) return;
 
   const name = String(doc.productName ?? doc.name ?? '');
-  const price = Number(doc.price ?? 0);
+  const price = ejsonNum(doc.price);
   const currency = String(doc.ccy ?? doc.currency ?? 'NGN');
   const categoryId = firstCategoryId(doc.categoryIds);
-  const storeId = doc.storeId ? String(doc.storeId) : null;
+  const storeId = ejsonId(doc.storeId) || null;
   const stockStatus = normaliseStockStatus(doc.stockStatus);
 
   await upsertProduct({
@@ -114,24 +114,23 @@ async function handleProductEvent(event: AtlasChangeEvent): Promise<void> {
 async function handleCosellEvent(event: AtlasChangeEvent): Promise<void> {
   const doc = event.fullDocument;
   if (!doc) return;
-  const id = String(doc._id ?? '');
+  const id = ejsonId(doc._id);
   if (!id) return;
+
+  const productId = ejsonId(doc.productId);
+  const sellerId = ejsonId(doc.userId) || ejsonId(doc.sellerId);
 
   await upsertCosellListing({
     id,
-    productId: String(doc.productId ?? ''),
-    sellerId: String(doc.userId ?? doc.sellerId ?? ''),
-    markupPct: Number(doc.markupPercentage ?? 0),
-    markedUpPrice: Number(doc.markedUpPrice ?? 0),
+    productId,
+    sellerId,
+    markupPct: ejsonNum(doc.markupPercentage),
+    markedUpPrice: ejsonNum(doc.markedUpPrice),
     isActive: doc.isActive !== false,
   });
 
-  if (event.operationType === 'insert') {
-    await recordEngagement(
-      String(doc.productId ?? ''),
-      'cosell_create',
-      doc.userId ? String(doc.userId) : undefined,
-    );
+  if (event.operationType === 'insert' && productId) {
+    await recordEngagement(productId, 'cosell_create', sellerId || undefined);
   }
 }
 
@@ -145,8 +144,8 @@ async function handleOrderEvent(event: AtlasChangeEvent): Promise<void> {
   const items = (doc.items ?? doc.orderItems) as Array<Record<string, unknown>> | undefined;
   if (!Array.isArray(items)) return;
   for (const item of items) {
-    const productId = item.productId ? String(item.productId) : null;
-    const buyerId = doc.userId ? String(doc.userId) : undefined;
+    const productId = ejsonId(item.productId);
+    const buyerId = ejsonId(doc.userId) || undefined;
     if (productId) {
       await recordEngagement(productId, 'view', buyerId);
     }
@@ -157,8 +156,47 @@ async function handleOrderEvent(event: AtlasChangeEvent): Promise<void> {
 /*  Helpers                                                          */
 /* ----------------------------------------------------------------- */
 
+/**
+ * Decode an EJSON-wrapped id to a plain string. Atlas Triggers serialize
+ * change events as Extended JSON, so a Mongo ObjectId arrives as
+ * `{ "$oid": "507f..." }` rather than a bare string. Handles plain
+ * strings too. Returns '' for null/undefined.
+ */
+function ejsonId(value: unknown): string {
+  if (value == null) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'object') {
+    const o = value as Record<string, unknown>;
+    if (typeof o.$oid === 'string') return o.$oid;
+  }
+  const s = String(value);
+  return s === '[object Object]' ? '' : s;
+}
+
+/**
+ * Decode an EJSON-wrapped number. Atlas sends numbers as
+ * `{ "$numberInt": "9500" }` / `$numberLong` / `$numberDouble` /
+ * `$numberDecimal`. Handles plain numbers/strings too. Returns 0 on
+ * anything unparseable (never NaN).
+ */
+function ejsonNum(value: unknown): number {
+  if (value == null) return 0;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  if (typeof value === 'object') {
+    const o = value as Record<string, unknown>;
+    const wrapped = o.$numberInt ?? o.$numberLong ?? o.$numberDouble ?? o.$numberDecimal;
+    if (wrapped != null) {
+      const n = Number(wrapped);
+      return Number.isFinite(n) ? n : 0;
+    }
+    return 0;
+  }
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
 function firstCategoryId(value: unknown): string | null {
-  if (Array.isArray(value) && value.length > 0) return String(value[0]);
+  if (Array.isArray(value) && value.length > 0) return ejsonId(value[0]) || String(value[0]);
   if (typeof value === 'string') return value;
   return null;
 }
