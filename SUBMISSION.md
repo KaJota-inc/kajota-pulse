@@ -57,11 +57,11 @@ Checks landing, the dashboard's `Live · Aurora` badge, Gemini `/api/explain`, t
 
 See [`README.md`](README.md) (run locally) and [`docs/provisioning-checklist.md`](docs/provisioning-checklist.md) (stand up the AWS side). Schema: [`docs/schema.sql`](docs/schema.sql). Seed: `node scripts/seed.mjs`.
 
-**Ingestion is proven in production:** a realistic Atlas change-event POSTed to the
-live `/api/ingest` correctly upserted a `products` row + `price_snapshot` + a
-`cosell_listings` row into Aurora (verified, then cleaned up). Wiring the actual
-Atlas Triggers (`docs/atlas-trigger.js`) just points production Mongo writes at
-that proven endpoint.
+**Ingestion is live and proven:** a real MongoDB Atlas **Database Trigger**
+(`Pulse_Trigger`, watching the `products` collection) is wired to `/api/ingest`.
+A real Mongo write fires the trigger → POSTs the change-event → upserts into
+Aurora — verified end-to-end. The handler decodes MongoDB Extended JSON
+(`{"$oid":…}`, `{"$numberInt":…}`) so real catalogue documents land correctly.
 
 ## Status
 
