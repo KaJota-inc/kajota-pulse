@@ -39,3 +39,22 @@ And you don't have to take my word for it. One command checks the whole live sta
 **[Back to the dashboard.]**
 
 Kajota Pulse: a live, AWS-Aurora-backed, Gemini-powered advisor for African micro-commerce, built end-to-end on the zero stack. Coach drafts, Pulse advises, Mesh settles. It's live at kajota-pulse.vercel.app. Thanks for watching.
+
+---
+
+## Video timing map — narrate over `docs/media/pulse-voiceover-source.mp4`
+
+This is the **silent, captionless 3:43 capture** (real Gemini, rich data) made for a voice-over. Drop it on a timeline in iMovie / CapCut (or play it and screen-record with mic), and read the lines below as each section comes up. Timings are approximate — pause the clip if you need more time; your voice sets the pace.
+
+| Time | On screen | Read |
+|---|---|---|
+| **0:00 – 0:06** | Intro title card | (let it breathe, or start the problem line) |
+| **0:06 – 0:18** | Landing page | *"…the hard part isn't writing the listing — it's knowing what to sell. Kajota Pulse answers that."* |
+| **0:18 – 0:34** | Dashboard, charts animate in | *"Everything's live — the green Live·Aurora badge means every card is a SQL query against AWS Aurora right now. Built on the zero stack."* |
+| **0:34 – 0:54** | **Advisor result** (Gemini picks) | *"One click and it becomes an advisor. Gemini ranks what to stock — top pick: [read it] — demand × margin × a competitor stock-out, with the exact units to buy."* |
+| **0:54 – 1:42** | **Explain why** (two products) | *"And every signal is interrogable — tap any product and a second Gemini call explains why it's moving and what to do."* |
+| **1:42 – 2:30** | Card tour (price waterfall → stock alerts → margins) | *"Four live signals: trending over 24h, your price vs the category median, competitor stock-outs as they happen, and categories ranked by realised margin."* |
+| **2:30 – 3:21** | Hero + **live Refresh advice** | *"And it re-runs live — fresh advice each time, straight off live Aurora data. No servers, no VPC, no stored DB password — Vercel reaches Aurora with short-lived IAM tokens."* |
+| **3:21 – 3:43** | Outro title card | *"Coach drafts, Pulse advises, Mesh settles. Live at kajota-pulse.vercel.app. Thanks for watching."* |
+
+**Not in this clip (browser-only capture):** the terminal beats — live Mongo→Aurora ingestion (`scripts/demo-cosell-insert.sh`) and `verify-live.mjs` 5/5. To include them, screen-record your terminal separately and splice on, or just say *"and every number is verifiable live with one command"* over the dashboard.
