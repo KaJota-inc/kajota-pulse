@@ -4,9 +4,13 @@
 
 **🟢 Live:** https://kajota-pulse.vercel.app — the dashboard reads live from AWS Aurora (green "Live · Aurora" badge).
 
+![Kajota Pulse demo — the Gemini advisor reading live Aurora signals](docs/media/kajota-pulse-demo.gif)
+
+> Above: a real run against the live deployment — open the dashboard (green `Live · Aurora`), click **"Ask the advisor"**, and Gemini 2.5 Flash returns a ranked buy-list synthesised from live Aurora data in ~2.5s, then the per-product "Explain why".
+
 **Hackathon submissions:**
 - **AWS / Vercel — Hack the Zero Stack** (Jun 29, $80K). Built on the prescribed stack: Vercel (Next.js) + shadcn/Tailwind UI + **AWS Aurora Serverless v2 (Postgres)** for the data layer.
-- **XPRIZE Build with Gemini** (Aug 17). Pulse becomes the third pillar of the **Kajota AI Stack** — Coach drafts, Pulse monitors, Mesh settles. Gemini 2.5 Flash powers the per-product "Explain why it's trending" analyst (`/api/explain`).
+- **XPRIZE Build with Gemini** (Aug 17). Pulse becomes the third pillar of the **Kajota AI Stack** — Coach drafts, Pulse monitors, Mesh settles. Gemini 2.5 Flash powers both the **"What should I stock this week?" advisor** (`/api/recommend`) and the per-product "Explain why it's trending" analyst (`/api/explain`).
 
 **Sibling repos** (KaJota-inc org, all private):
 - [`kajota-coach`](https://github.com/KaJota-inc/kajota-coach) — single-shot AI listing pipeline (Coach v1)
