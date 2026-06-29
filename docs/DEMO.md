@@ -1,137 +1,113 @@
-# Kajota Pulse — 90-second demo script
+# Kajota Pulse — 3–5 minute narrated demo script
 
-For recording a screencast to paste into the **Hack the Zero Stack** (AWS / Vercel) submission. Target: **90 seconds.** Each beat below = ~15-25 seconds of screen time. The whole thing runs against the **live** deployment — every number is real AWS Aurora data.
+For the **Hack the Zero Stack** submission video (spec: **3–5 minutes**). This is a *narrated screen recording* — your voice over the live app. The silent captioned clip (`docs/media/kajota-pulse-demo.mp4`) is the README/gallery asset; **this** is the judged demo video.
 
-> The shape of this script mirrors the 0G / Witness demo (`kajota-witness/docs/DEMO.md`): show real surfaces doing load-bearing work, name the latency instead of apologising for it, and end on a one-command "anyone can verify this" proof.
+Target: **~4:00.** Each beat lists what to **Show**, what to **Say** (read it aloud, lightly paraphrase), and any **Action**. Timings are cumulative.
+
+> Shape borrowed from the 0G / Witness demo (`kajota-witness/docs/DEMO.md`): show real surfaces doing load-bearing work, name the latency instead of apologising for it, and end on a one-command "anyone can verify this" proof.
 
 ---
 
 ## Before you hit record
 
-- [ ] **Pre-warm Aurora AND the advisor.** Aurora Serverless v2 scales to zero — the first request after idle cold-starts ~8s and the dashboard will briefly show the grey *"Mock data"* badge. Two minutes before recording, run:
+- [ ] **Pre-warm Aurora + the advisor** (Serverless v2 scales to zero; first call cold-starts ~8s). ~2 min before recording:
       ```bash
       cd ~/Documents/kajota-pulse
       curl -s -o /dev/null -w 'dashboard %{http_code}\n' https://kajota-pulse.vercel.app/dashboard
       curl -s -X POST https://kajota-pulse.vercel.app/api/recommend | python3 -m json.tool | head -3
       ```
-      Repeat the dashboard curl until the badge is green and the advisor returns `"source": "aurora"`. Now the cluster stays warm for your take.
-- [ ] **(Optional) Reset to a camera-clean seed** so the numbers are tidy: `node scripts/seed.mjs` (12 products / 822 engagement / 33 cosell). Ask Claude to run this for you — it's the hackathon DB, not production.
-- [ ] Open **https://kajota-pulse.vercel.app** in a fresh tab (the landing pitch).
-- [ ] Open **https://kajota-pulse.vercel.app/dashboard** in a second tab (you'll start on the landing tab and click through).
-- [ ] Have a **terminal** ready in `~/Documents/kajota-pulse` for the verify beat at 01:10. Pre-type `node scripts/verify-live.mjs` but **don't hit enter** until the beat.
-- [ ] Browser at ~110-125% zoom; window 1280×800.
-- [ ] Mute Slack / Discord / notifications.
-- [ ] Use Loom, OBS, or QuickTime (anything that captures system audio + mic).
-- [ ] **DON'T have `.env.local` open in any visible editor or terminal** — it holds the AWS secret key + ingest secret. Don't `cat` it on camera.
+      Repeat until the badge is green and the advisor returns `"source":"aurora"` + `"model":"gemini-2.5-flash"`.
+- [ ] **(Optional) Reset to a clean seed** so numbers are tidy: `node scripts/seed.mjs` (ask Claude — it's the hackathon DB, not production).
+- [ ] Tabs open: **landing** (`/`), **dashboard** (`/dashboard`). A **terminal** in `~/Documents/kajota-pulse` for the live-ingestion + verify beats.
+- [ ] Browser ~110–125% zoom, window 1280×800. Mute notifications.
+- [ ] Recorder: Loom / OBS / QuickTime (system audio + mic).
+- [ ] **Do NOT show `.env.local`** on screen — it holds the AWS secret + ingest secret.
 
 ---
 
 ## Script
 
-### **00:00 – 00:15 — The problem (15s)**
-
-**Show:** The landing page at `kajota-pulse.vercel.app`.
-
+### 0:00 – 0:25 — The problem + the stack (25s)
+**Show:** Landing page.
 **Say:**
-> "Across African micro-commerce, sellers buy stock from wholesalers and resell to their network for a markup. The hard part isn't writing the listing — it's knowing *what to sell*. Kajota Pulse is the Bloomberg terminal that answers it."
-
+> "Across African micro-commerce, sellers — we call them co-sellers — buy stock from wholesalers and resell to their network for a markup. The hard part isn't writing the listing. It's *knowing what to sell*. Kajota Pulse is the Bloomberg terminal that answers that question — and it's one of three live apps in our stack: Coach drafts the listing, Pulse tells you what to stock, Mesh settles the deal on-chain."
 **Action:** Click **Open the dashboard**.
 
-### **00:15 – 00:30 — This is live AWS data, not a mock (15s)**
-
-**Show:** The dashboard. Point at the top-right badge.
-
+### 0:25 – 0:50 — This is live AWS data (25s)
+**Show:** Dashboard; point at the top-right badge.
 **Say:**
-> "Everything you're seeing is live. That green badge — `Live · Aurora` — means every card is a SQL query running right now against AWS Aurora Serverless v2. No mock data, no fixtures."
+> "Everything here is live. That green `Live · Aurora` badge means every card you're about to see is a SQL query running right now against AWS Aurora Serverless v2 — no mock data, no fixtures. It's built on the zero stack: Next.js on Vercel, a shadcn/v0 UI, Recharts — and Aurora that scales to zero when nobody's looking."
 
-**Action:** Hover the green **`Live · Aurora`** badge for a beat.
-
-### **00:30 – 00:55 — The money shot: the advisor (25s) ← the punchline**
-
-**Show:** The hero card at the top — **"What should I stock this week?"**
-
+### 0:50 – 1:40 — The advisor: the hero feature (50s)
+**Show:** The "What should I stock this week?" card.
 **Say:**
-> "Here's where Pulse stops being a dashboard and becomes an advisor. One click."
-
-**Action:** Click **Ask the advisor**. The button shows *"Reading your signals…"* for ~3s.
-
-**Say (while it loads):**
-> "Gemini is reading the live Aurora signals — trending demand, category margins, competitor stock-outs, and price position — and ranking what to buy."
-
-**Action:** The ranked buy-list appears. Read the top pick aloud.
-
+> "Here's where Pulse stops being a dashboard you read and becomes an advisor that tells you what to do. One click."
+**Action:** Click **Ask the advisor** (~3s).
+**Say (while loading):**
+> "Gemini is reading the live Aurora signals — trending demand, category margins, competitor stock-outs, and price position."
+**Action:** Result appears. Read the top pick.
 **Say:**
-> "Top pick: Organic Shea Butter — stock ten to fifteen units before the weekend. And the *why* is specific: favorites up twenty-eight, it's in the high-margin Beauty category at eighteen percent, and a competitor just ran out of stock. That's demand times margin times opportunity, in one sentence. It doesn't show me numbers and make me guess — it tells me what to do."
+> "It ranks what to stock this week, and every pick fuses three things: demand, margin, and opportunity. Look at this one — Organic Shea Butter: twenty-seven new favorites, it's in the high-margin Beauty category at eighteen percent, *and* a competitor just ran out of a similar cream. So: stock ten to fifteen units before the weekend. It doesn't show me numbers and make me guess — it tells me what to do, and why. Under the hood that's Gemini 2.5 Flash returning structured JSON, with a deterministic fallback if the model's ever unavailable, so the card never breaks in front of a customer."
+**Action:** Point at *"Synthesised from live Aurora data in ~2.5s."*
 
-**Action:** Point at the small line: *"Synthesised from live Aurora data in ~2900 ms."*
-
-### **00:55 – 01:10 — The signals behind the advice (15s)**
-
-**Show:** The **Trending — last 24h** card.
-
-**Action:** Tap the chevron next to "Ankara Print Slides".
-
+### 1:40 – 2:05 — Explain why (25s)
+**Show:** Trending card; tap the chevron on "Ankara Print Slides".
 **Say:**
-> "Every recommendation is backed by signals you can interrogate. Tap any trending product and a second Gemini call explains exactly why it's moving — a favorites spike on WhatsApp, an influencer feature — and what to do about it."
+> "And every signal is interrogable. Tap any trending product and a second Gemini call explains *why* it's moving — a favorites spike on WhatsApp, an influencer feature — and what to do about it. So the advice up top is never a black box; you can drill into the evidence behind it."
 
-### **01:10 – 01:25 — Verify it's all real, one command (15s)**
+### 2:05 – 3:00 — Tour the four signals (55s)
+**Say (Trending, ~12s):**
+> "Let me walk the four signals. Trending is a composite of favorites, shares, and views over a rolling 24-hour window — computed in SQL as a view."
+**Action:** Gesture to the price waterfall.
+**Say (Price waterfall, ~13s):**
+> "Price waterfall: your price versus the category median — a *true* median via Postgres `percentile_cont` — versus the lowest competitor. Grey bars mean you're not selling in that category yet — a gap to fill."
+**Action:** Scroll down to the bottom row.
+**Say (Stock alerts, ~13s):**
+> "Stock alerts: the moment a competitor goes out of stock in a category you sell, it surfaces here. That's your window to capture their demand before they restock."
+**Say (Margin leaderboard, ~14s):**
+> "And the margin leaderboard ranks categories by realised co-sell markup — Beauty at eighteen percent, Fashion at fourteen — so you stock where the margin actually is, not just where there's noise."
 
+### 3:00 – 3:40 — It's REAL data, live (40s) ← the credibility beat
 **Show:** Switch to your terminal.
-
-**Action:** Hit enter on `node scripts/verify-live.mjs`.
-
 **Say:**
-> "And a judge doesn't have to take my word for it. This one command checks the whole live stack: the landing page, the `Live · Aurora` badge, the Gemini endpoint, the ingestion auth gate, and a real IAM-authenticated row count straight out of Aurora."
-
-**Action:** The five green checks print. Let them land on screen.
-
+> "Now — is this real, or did I seed it? Watch. I'll write one product into our live MongoDB production database."
+**Action:** Run `bash scripts/demo-cosell-insert.sh` (prints `INSERTED_ID=…`).
 **Say:**
-> "Five for five. All live."
+> "Three MongoDB Atlas Database Triggers are watching the real Kajota catalogue. That write just fired one — it POSTs the change event to our ingest endpoint on Vercel, which upserts it into Aurora over a passwordless IAM connection."
+**Action:** Run the watch one-liner (ask Claude for it) or refresh the dashboard.
+**Say:**
+> "And there it is, landed in Aurora seconds later. This isn't a fixture — it's a live change-data pipeline from production Mongo into AWS."
 
-### **01:25 – 01:30 — Architecture + the bigger picture (close)**
+### 3:40 – 4:05 — Verify + architecture (25s)
+**Action:** Run `node scripts/verify-live.mjs`.
+**Say:**
+> "And you don't have to take my word for any of it. One command checks the whole live stack — the landing page, the Aurora badge, both Gemini endpoints, the ingest auth gate, and a real IAM-authenticated row count straight out of Aurora. Five for five. No servers, no VPC, no stored database password — Vercel talks to Aurora with short-lived IAM tokens."
 
+### 4:05 – 4:20 — Close (15s)
 **Show:** Back to the dashboard.
-
 **Say:**
-> "No servers, no VPC, no stored database password — Vercel talks to Aurora with short-lived IAM tokens. And Pulse is one of three live Kajota apps: Coach drafts the listing, Pulse tells you what to stock, Mesh settles the deal on-chain. Built on the zero stack."
+> "Kajota Pulse: a live, AWS-Aurora-backed, Gemini-powered advisor for African micro-commerce, built end-to-end on the zero stack. Coach drafts, Pulse advises, Mesh settles. It's live at kajota-pulse.vercel.app. Thanks for watching."
 
 ---
 
+## Trim to 3:00 if needed
+Cut the four-signal tour (2:05–3:00) to ~25s ("four more live signals — trending velocity, price position, competitor stock-outs, and category margins") and keep the advisor + live-ingestion beats. Those two are the differentiators.
+
 ## Things NOT to do on camera
+- Don't `cat`/open `.env.local` — leaks the AWS secret + ingest secret.
+- Don't click the advisor cold (pre-warm, else ~8s + possible heuristic fallback). If the badge says `heuristic`, click **Refresh advice** once.
+- Don't refresh after the advice loads (you'll lose the buy-list).
+- Don't apologise for the ~2.5s advisor latency — name it ("a real Gemini call over live Aurora").
 
-- **Don't `cat` or open `.env.local`** — it leaks the AWS secret key + the ingest secret.
-- **Don't click the advisor cold.** If you skipped the pre-warm, the first call is ~8s and may fall back to the heuristic ranking (the badge will read `heuristic` instead of `gemini-2.5-flash`). Pre-warm so it's a crisp ~3s real-Gemini call.
-- **Don't refresh after the advice loads** — you'll lose the buy-list and have to re-ask.
-- **Don't apologise for the ~3s advisor latency** — name it ("this is a real Gemini call over live Aurora data").
-- **Don't read every pick** — read the #1 pick well; let the rest sit on screen.
+## If something breaks
+- Badge says **Mock data** → Aurora cold-started; refresh once or twice.
+- Advisor badge says **heuristic** → Gemini hiccup; wait ~20s, click **Refresh advice**.
+- `verify-live.mjs` Aurora line fails with `ENOTFOUND` → local DNS (phone hotspot/VPN); it auto-retries 5×, else record that beat on stable Wi-Fi.
+- Live-ingestion write errors on a unique index → already handled; the script supplies all three index fields. `--clean` removes the demo doc afterwards.
 
-## If something breaks during recording
-
-- **Badge says "Mock data":** Aurora cold-started or briefly unreachable. Refresh the dashboard once or twice — it goes green within a few seconds once the cluster wakes. (This is exactly why you pre-warm.)
-- **Advisor badge says `heuristic`, not `gemini`:** Gemini returned an error/rate-limit and the card fell back to the deterministic ranking. The demo still works — but for the clean take, wait ~20s and click **Refresh advice**.
-- **`verify-live.mjs` shows the Aurora check failing with `ENOTFOUND`:** This is a *local* DNS failure, not the cluster — checks 1-4 (which hit the live Vercel URL) prove the deployed stack regardless. It happens on a phone hotspot / VPN, where Node's `getaddrinfo` intermittently can't resolve the RDS endpoint's CNAME chain. The script now auto-retries transient errors 5×; if it still fails, **record this beat on stable Wi-Fi** (off the hotspot). The first four green checks already prove "Vercel reads live Aurora" to any judge.
-
-## Reference artifacts to mention / pin
-
-- Live app: **https://kajota-pulse.vercel.app**
-- Repo: **https://github.com/KaJota-inc/kajota-pulse**
-- AWS Aurora Serverless v2 (PostgreSQL) · eu-west-1 · passwordless IAM-token auth
-- Gemini 2.5 Flash — two surfaces: `/api/recommend` (advisor) + `/api/explain`
-- One-command health check: `node scripts/verify-live.mjs` (5/5)
-
-## What to caption / pin in the video description
-
-```
-Kajota Pulse — the Bloomberg terminal for African micro-commerce.
-Built on the Zero Stack: Next.js on Vercel + AWS Aurora Serverless v2.
-
-It doesn't just monitor the market — Gemini reads the live Aurora signals
-and tells the seller what to stock this week.
-
-Live: https://kajota-pulse.vercel.app
-Repo: https://github.com/KaJota-inc/kajota-pulse
-
-Stack: Next.js 16 (Vercel) + Aurora Serverless v2 (passwordless IAM tokens)
-+ Gemini 2.5 Flash + MongoDB Atlas Triggers → /api/ingest. Zero servers,
-zero VPC, zero stored DB password.
-```
+## Reference artifacts to pin
+- Live: **https://kajota-pulse.vercel.app** · Repo: **https://github.com/KaJota-inc/kajota-pulse**
+- AWS Aurora Serverless v2 (Postgres) · eu-west-1 · passwordless IAM-token auth
+- Gemini 2.5 Flash: `/api/recommend` (advisor) + `/api/explain`
+- 3 live MongoDB Atlas triggers → `/api/ingest`
+- `node scripts/verify-live.mjs` (5/5)

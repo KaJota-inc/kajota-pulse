@@ -7,7 +7,7 @@
 ![Kajota Pulse demo — the Gemini advisor reading live Aurora signals](docs/media/kajota-pulse-demo.gif)
 
 > Above: a captioned ~80s walkthrough against the **live** deployment — title cards, the `Live · Aurora` badge + stack, the Gemini **"Ask the advisor"** buy-list (with structured-output + heuristic-fallback notes), "Explain why", a tour of each card (Trending · Price waterfall · Stock alerts · Margin leaderboard), the live MongoDB-Atlas-trigger ingestion, and the passwordless-IAM zero-stack architecture.
-> ▶ Full-resolution MP4 (for the demo video): [`docs/media/kajota-pulse-demo.mp4`](docs/media/kajota-pulse-demo.mp4)
+> ▶ MP4: [`docs/media/kajota-pulse-demo.mp4`](docs/media/kajota-pulse-demo.mp4) · 🎙️ 3–5 min narrated script: [`docs/DEMO.md`](docs/DEMO.md) · ✍️ build write-up (published content): [`docs/BLOG.md`](docs/BLOG.md)
 
 **Hackathon submissions:**
 - **AWS / Vercel — Hack the Zero Stack** (Jun 29, $80K). Built on the prescribed stack: Vercel (Next.js) + shadcn/Tailwind UI + **AWS Aurora Serverless v2 (Postgres)** for the data layer.
