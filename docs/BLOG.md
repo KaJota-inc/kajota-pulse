@@ -1,6 +1,6 @@
 # Building a passwordless, Gemini-advised dashboard on the "zero stack" in a weekend
 
-*A build write-up for the AWS × Vercel "Hack the Zero Stack" hackathon. Live app: [kajota-pulse.vercel.app](https://kajota-pulse.vercel.app) · Code: [github.com/KaJota-inc/kajota-pulse](https://github.com/KaJota-inc/kajota-pulse)*
+*I built Kajota Pulse and wrote this article as my entry for the **AWS × Vercel "H0: Hack the Zero Stack"** hackathon (**#H0Hackathon**). Live app: [kajota-pulse.vercel.app](https://kajota-pulse.vercel.app) · Code: [github.com/KaJota-inc/kajota-pulse](https://github.com/KaJota-inc/kajota-pulse)*
 
 ---
 
