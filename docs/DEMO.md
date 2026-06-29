@@ -109,7 +109,7 @@ For recording a screencast to paste into the **Hack the Zero Stack** (AWS / Verc
 
 - **Badge says "Mock data":** Aurora cold-started or briefly unreachable. Refresh the dashboard once or twice — it goes green within a few seconds once the cluster wakes. (This is exactly why you pre-warm.)
 - **Advisor badge says `heuristic`, not `gemini`:** Gemini returned an error/rate-limit and the card fell back to the deterministic ranking. The demo still works — but for the clean take, wait ~20s and click **Refresh advice**.
-- **`verify-live.mjs` shows a transient Aurora failure:** Serverless v2 mid-scale. Re-run it once — it'll go 5/5.
+- **`verify-live.mjs` shows the Aurora check failing with `ENOTFOUND`:** This is a *local* DNS failure, not the cluster — checks 1-4 (which hit the live Vercel URL) prove the deployed stack regardless. It happens on a phone hotspot / VPN, where Node's `getaddrinfo` intermittently can't resolve the RDS endpoint's CNAME chain. The script now auto-retries transient errors 5×; if it still fails, **record this beat on stable Wi-Fi** (off the hotspot). The first four green checks already prove "Vercel reads live Aurora" to any judge.
 
 ## Reference artifacts to mention / pin
 

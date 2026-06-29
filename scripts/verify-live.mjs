@@ -60,20 +60,53 @@ console.log(`\nKajota Pulse — live verification (${BASE})\n`);
 }
 
 // 5. Aurora row counts (optional — needs creds)
+//
+// This is the ONLY check that connects to Aurora directly from wherever
+// you run the script — so unlike checks 1-4 (which hit the live Vercel
+// URL and prove the deployed stack to anyone) it depends on the local
+// machine's network. On a flaky link (phone hotspot, VPN), Node's
+// getaddrinfo intermittently fails to resolve the RDS endpoint's CNAME
+// chain with ENOTFOUND even though `host`/Vercel resolve it fine. So we
+// retry transient DNS/connection errors a few times before failing.
+const TRANSIENT = /ENOTFOUND|EAI_AGAIN|ETIMEDOUT|ECONNRESET|ECONNREFUSED|Connection terminated/i;
 if (process.env.PULSE_DB_HOST && (process.env.PULSE_AWS_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID)) {
-  try {
-    const { Signer } = await import('@aws-sdk/rds-signer');
-    const pg = (await import('pg')).default;
-    const accessKeyId = process.env.PULSE_AWS_ACCESS_KEY_ID ?? process.env.AWS_ACCESS_KEY_ID;
-    const secretAccessKey = process.env.PULSE_AWS_SECRET_ACCESS_KEY ?? process.env.AWS_SECRET_ACCESS_KEY;
-    const signer = new Signer({ hostname: process.env.PULSE_DB_HOST, port: 5432, username: process.env.PULSE_DB_USER ?? 'postgres', region: process.env.PULSE_AWS_REGION ?? process.env.AWS_REGION ?? 'eu-west-1', credentials: { accessKeyId, secretAccessKey } });
-    const c = new pg.Client({ host: process.env.PULSE_DB_HOST, port: 5432, user: process.env.PULSE_DB_USER ?? 'postgres', database: process.env.PULSE_DB_NAME ?? 'postgres', password: await signer.getAuthToken(), ssl: { rejectUnauthorized: false } });
-    await c.connect();
-    const r = await c.query('SELECT count(*)::int AS n FROM products');
-    r.rows[0].n > 0 ? ok(`Aurora reachable via IAM token — products: ${r.rows[0].n} rows`) : no('Aurora reachable but products table empty (run scripts/seed.mjs)');
-    await c.end();
-  } catch (e) {
-    no(`Aurora check failed: ${e instanceof Error ? e.message : e}`);
+  const { Signer } = await import('@aws-sdk/rds-signer');
+  const pg = (await import('pg')).default;
+  const accessKeyId = process.env.PULSE_AWS_ACCESS_KEY_ID ?? process.env.AWS_ACCESS_KEY_ID;
+  const secretAccessKey = process.env.PULSE_AWS_SECRET_ACCESS_KEY ?? process.env.AWS_SECRET_ACCESS_KEY;
+  const region = process.env.PULSE_AWS_REGION ?? process.env.AWS_REGION ?? 'eu-west-1';
+
+  const attempts = 5;
+  let lastErr;
+  for (let i = 1; i <= attempts; i++) {
+    let c;
+    try {
+      const signer = new Signer({ hostname: process.env.PULSE_DB_HOST, port: 5432, username: process.env.PULSE_DB_USER ?? 'postgres', region, credentials: { accessKeyId, secretAccessKey } });
+      c = new pg.Client({ host: process.env.PULSE_DB_HOST, port: 5432, user: process.env.PULSE_DB_USER ?? 'postgres', database: process.env.PULSE_DB_NAME ?? 'postgres', password: await signer.getAuthToken(), ssl: { rejectUnauthorized: false } });
+      await c.connect();
+      const r = await c.query('SELECT count(*)::int AS n FROM products');
+      r.rows[0].n > 0 ? ok(`Aurora reachable via IAM token — products: ${r.rows[0].n} rows`) : no('Aurora reachable but products table empty (run scripts/seed.mjs)');
+      await c.end();
+      lastErr = null;
+      break;
+    } catch (e) {
+      lastErr = e;
+      try { await c?.end(); } catch { /* ignore */ }
+      const msg = e instanceof Error ? e.message : String(e);
+      if (TRANSIENT.test(msg) && i < attempts) {
+        console.log(`  ·  Aurora attempt ${i}/${attempts} hit a transient network error (${msg.split('\n')[0]}) — retrying…`);
+        await new Promise(res => setTimeout(res, 2000 * i));
+        continue;
+      }
+      break;
+    }
+  }
+  if (lastErr) {
+    const msg = lastErr instanceof Error ? lastErr.message : String(lastErr);
+    no(`Aurora check failed: ${msg}`);
+    if (TRANSIENT.test(msg)) {
+      console.log('  ·  NOTE: this is a LOCAL network/DNS failure, not the cluster. Checks 1-4 confirm Vercel reads Aurora fine. Try a stable Wi-Fi connection (off phone hotspot/VPN).');
+    }
   }
 } else {
   console.log('  ·  Aurora row-count check skipped (no DB creds in env)');
