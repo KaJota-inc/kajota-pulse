@@ -6,7 +6,7 @@
 
 ![Kajota Pulse demo — the Gemini advisor reading live Aurora signals](docs/media/kajota-pulse-demo.gif)
 
-> Above: a captioned ~48s walkthrough against the **live** deployment — the `Live · Aurora` badge, the Gemini **"Ask the advisor"** buy-list, "Explain why", and a tour of each card (Trending · Price waterfall · Stock alerts · Margin leaderboard) plus the passwordless-IAM architecture.
+> Above: a captioned ~80s walkthrough against the **live** deployment — title cards, the `Live · Aurora` badge + stack, the Gemini **"Ask the advisor"** buy-list (with structured-output + heuristic-fallback notes), "Explain why", a tour of each card (Trending · Price waterfall · Stock alerts · Margin leaderboard), the live MongoDB-Atlas-trigger ingestion, and the passwordless-IAM zero-stack architecture.
 > ▶ Full-resolution MP4 (for the demo video): [`docs/media/kajota-pulse-demo.mp4`](docs/media/kajota-pulse-demo.mp4)
 
 **Hackathon submissions:**
