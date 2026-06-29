@@ -6,7 +6,8 @@
 
 ![Kajota Pulse demo — the Gemini advisor reading live Aurora signals](docs/media/kajota-pulse-demo.gif)
 
-> Above: a real run against the live deployment — open the dashboard (green `Live · Aurora`), click **"Ask the advisor"**, and Gemini 2.5 Flash returns a ranked buy-list synthesised from live Aurora data in ~2.5s, then the per-product "Explain why".
+> Above: a captioned run against the **live** deployment — open the dashboard (green `Live · Aurora`), click **"Ask the advisor"**, and Gemini 2.5 Flash returns a ranked buy-list synthesised from live Aurora data in ~2.5s, then the per-product "Explain why".
+> ▶ Full-resolution MP4 (for the demo video): [`docs/media/kajota-pulse-demo.mp4`](docs/media/kajota-pulse-demo.mp4)
 
 **Hackathon submissions:**
 - **AWS / Vercel — Hack the Zero Stack** (Jun 29, $80K). Built on the prescribed stack: Vercel (Next.js) + shadcn/Tailwind UI + **AWS Aurora Serverless v2 (Postgres)** for the data layer.
