@@ -222,60 +222,83 @@ export async function POST(): Promise<NextResponse> {
     },
   };
 
-  try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(20_000),
-    });
-    if (!res.ok) {
-      // Gemini error → heuristic fallback, never a 500 in a demo.
-      const fb = heuristicRecommendations(data);
+  // Gemini's free tier transiently rate-limits the structured-output call
+  // (fast 429s), so a single shot lands on the heuristic fallback maybe a
+  // third of the time. Retry on 429/5xx (and on empty/garbled responses)
+  // before giving up — this takes a single user click from ~60% to ~90%+
+  // real-Gemini. Bounded by an overall deadline so we never blow the
+  // serverless function's wall-clock limit; the heuristic still covers a
+  // genuine outage.
+  const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+  const DEADLINE_MS = 9_000;
+  const MAX_ATTEMPTS = 3;
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const remaining = DEADLINE_MS - (Date.now() - start);
+    if (remaining < 1_500) break; // not enough time for another shot
+
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(Math.min(8_000, remaining)),
+      });
+
+      if (!res.ok) {
+        // 429 (rate limit) and 5xx are transient — retry; anything else isn't.
+        if ((res.status === 429 || res.status >= 500) && attempt < MAX_ATTEMPTS) {
+          await sleep(500);
+          continue;
+        }
+        break;
+      }
+
+      const json = (await res.json()) as {
+        candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+      };
+      const text =
+        json.candidates?.[0]?.content?.parts?.map(p => p.text ?? '').join('').trim() ?? '';
+      const parsed = JSON.parse(text) as {
+        headline?: string;
+        recommendations?: StockRecommendation[];
+      };
+      const recommendations = Array.isArray(parsed.recommendations)
+        ? parsed.recommendations.slice(0, 4)
+        : [];
+
+      if (recommendations.length === 0) {
+        if (attempt < MAX_ATTEMPTS) {
+          await sleep(400);
+          continue;
+        }
+        break;
+      }
+
       return NextResponse.json<AdvisorResponse>({
-        ...fb,
-        model: 'heuristic',
+        headline:
+          parsed.headline ?? `${recommendations[0].product} is your strongest pick this week.`,
+        recommendations,
+        model,
         source,
         latencyMs: Date.now() - start,
       });
+    } catch {
+      // network error / timeout / JSON parse — retry if there's budget left.
+      if (attempt < MAX_ATTEMPTS && DEADLINE_MS - (Date.now() - start) > 1_500) {
+        await sleep(400);
+        continue;
+      }
+      break;
     }
-    const json = (await res.json()) as {
-      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-    };
-    const text =
-      json.candidates?.[0]?.content?.parts?.map(p => p.text ?? '').join('').trim() ?? '';
-
-    const parsed = JSON.parse(text) as {
-      headline?: string;
-      recommendations?: StockRecommendation[];
-    };
-    const recommendations = Array.isArray(parsed.recommendations)
-      ? parsed.recommendations.slice(0, 4)
-      : [];
-    if (recommendations.length === 0) {
-      const fb = heuristicRecommendations(data);
-      return NextResponse.json<AdvisorResponse>({
-        ...fb,
-        model: 'heuristic',
-        source,
-        latencyMs: Date.now() - start,
-      });
-    }
-
-    return NextResponse.json<AdvisorResponse>({
-      headline: parsed.headline ?? `${recommendations[0].product} is your strongest pick this week.`,
-      recommendations,
-      model,
-      source,
-      latencyMs: Date.now() - start,
-    });
-  } catch {
-    const fb = heuristicRecommendations(data);
-    return NextResponse.json<AdvisorResponse>({
-      ...fb,
-      model: 'heuristic',
-      source,
-      latencyMs: Date.now() - start,
-    });
   }
+
+  // All attempts exhausted (or a real outage) → deterministic fallback.
+  const fb = heuristicRecommendations(data);
+  return NextResponse.json<AdvisorResponse>({
+    ...fb,
+    model: 'heuristic',
+    source,
+    latencyMs: Date.now() - start,
+  });
 }
