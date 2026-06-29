@@ -1,6 +1,7 @@
 # Kajota Pulse — Hack the Zero Stack submission
 
 **Live:** https://kajota-pulse.vercel.app · **Dashboard:** https://kajota-pulse.vercel.app/dashboard
+**▶ Demo video:** https://youtu.be/5RY1eXo3Pb0
 **Repo:** https://github.com/KaJota-inc/kajota-pulse
 **Hackathon:** AWS / Vercel — Hack the Zero Stack ($80K, deadline Jun 29, 2026)
 

@@ -3,6 +3,7 @@
 > Real-time pricing intelligence for African co-sellers — see trending products, price movements, competitor inventory, and high-margin opportunities at a glance.
 
 **🟢 Live:** https://kajota-pulse.vercel.app — the dashboard reads live from AWS Aurora (green "Live · Aurora" badge).
+**▶ Demo video:** https://youtu.be/5RY1eXo3Pb0
 
 ![Kajota Pulse demo — the Gemini advisor reading live Aurora signals](docs/media/kajota-pulse-demo.gif)
 
