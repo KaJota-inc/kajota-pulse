@@ -76,7 +76,7 @@ Target: **~4:00.** Each beat lists what to **Show**, what to **Say** (read it al
 **Action:** Run `bash scripts/demo-cosell-insert.sh` (prints `INSERTED_ID=…`).
 **Say:**
 > "Three MongoDB Atlas Database Triggers are watching the real Kajota catalogue. That write just fired one — it POSTs the change event to our ingest endpoint on Vercel, which upserts it into Aurora over a passwordless IAM connection."
-**Action:** Run the watch one-liner (ask Claude for it) or refresh the dashboard.
+**Action:** In a second terminal tab, run `node scripts/watch-cosell.mjs` (start it *before* the insert and it sits on "waiting…", then flips to "✅ LANDED IN AURORA" when the row arrives).
 **Say:**
 > "And there it is, landed in Aurora seconds later. This isn't a fixture — it's a live change-data pipeline from production Mongo into AWS."
 
