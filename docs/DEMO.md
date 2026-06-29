@@ -17,6 +17,7 @@ Target: **~4:00.** Each beat lists what to **Show**, what to **Say** (read it al
       curl -s -X POST https://kajota-pulse.vercel.app/api/recommend | python3 -m json.tool | head -3
       ```
       Repeat until the badge is green and the advisor returns `"source":"aurora"` + `"model":"gemini-2.5-flash"`.
+- [ ] **🔴 Gemini-readiness gate — don't record until this passes.** The free-tier Gemini key rate-limits under bursty use; when throttled, `/api/recommend` returns `"model":"heuristic"` instead. Run the curl above a few times — **only start recording once it returns `gemini-2.5-flash` reliably** (2–3 in a row). If it's stuck on `heuristic`, you've hit the per-minute or daily quota: wait a few minutes (per-minute) or until the daily reset (~midnight US-Pacific), or swap in a fresh/paid `GEMINI_API_KEY` on Vercel. The on-camera advisor must show the Gemini badge, not heuristic.
 - [ ] **(Optional) Reset to a clean seed** so numbers are tidy: `node scripts/seed.mjs` (ask Claude — it's the hackathon DB, not production).
 - [ ] Tabs open: **landing** (`/`), **dashboard** (`/dashboard`). A **terminal** in `~/Documents/kajota-pulse` for the live-ingestion + verify beats.
 - [ ] Browser ~110–125% zoom, window 1280×800. Mute notifications.
@@ -45,10 +46,11 @@ Target: **~4:00.** Each beat lists what to **Show**, what to **Say** (read it al
 **Action:** Click **Ask the advisor** (~3s).
 **Say (while loading):**
 > "Gemini is reading the live Aurora signals — trending demand, category margins, competitor stock-outs, and price position."
-**Action:** Result appears. Read the top pick.
+**Action:** Result appears. **Read the actual top pick on screen** — the live numbers roll, so read whatever Gemini returned (product, the reason line, the "Stock N units" action). Use this as the shape:
 **Say:**
-> "It ranks what to stock this week, and every pick fuses three things: demand, margin, and opportunity. Look at this one — Organic Shea Butter: twenty-seven new favorites, it's in the high-margin Beauty category at eighteen percent, *and* a competitor just ran out of a similar cream. So: stock ten to fifteen units before the weekend. It doesn't show me numbers and make me guess — it tells me what to do, and why. Under the hood that's Gemini 2.5 Flash returning structured JSON, with a deterministic fallback if the model's ever unavailable, so the card never breaks in front of a customer."
-**Action:** Point at *"Synthesised from live Aurora data in ~2.5s."*
+> "It ranks what to stock this week, and every pick fuses three things: demand, margin, and opportunity. Take the top pick here — [read it]: a spike in new favorites, a healthy category margin, *and* a competitor just went out of stock. So it tells me exactly how many units to stock, and why. It doesn't show me numbers and make me guess — it tells me what to do. Under the hood that's Gemini 2.5 Flash returning structured JSON, with a deterministic fallback if the model's ever unavailable, so the card never breaks in front of a customer."
+**Action:** Point at *"Synthesised from live Aurora data in ~Xms."* (read the real latency).
+> **Note:** make sure the badge in the result reads **`Gemini · gemini-2.5-flash`**, not `heuristic`. If it says `heuristic`, click **Refresh advice** and wait — see the Gemini-readiness gate above.
 
 ### 1:40 – 2:05 — Explain why (25s)
 **Show:** Trending card; tap the chevron on "Ankara Print Slides".
