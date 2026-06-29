@@ -6,7 +6,7 @@
 
 ![Kajota Pulse demo — the Gemini advisor reading live Aurora signals](docs/media/kajota-pulse-demo.gif)
 
-> Above: a captioned run against the **live** deployment — open the dashboard (green `Live · Aurora`), click **"Ask the advisor"**, and Gemini 2.5 Flash returns a ranked buy-list synthesised from live Aurora data in ~2.5s, then the per-product "Explain why".
+> Above: a captioned ~48s walkthrough against the **live** deployment — the `Live · Aurora` badge, the Gemini **"Ask the advisor"** buy-list, "Explain why", and a tour of each card (Trending · Price waterfall · Stock alerts · Margin leaderboard) plus the passwordless-IAM architecture.
 > ▶ Full-resolution MP4 (for the demo video): [`docs/media/kajota-pulse-demo.mp4`](docs/media/kajota-pulse-demo.mp4)
 
 **Hackathon submissions:**
