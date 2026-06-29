@@ -12,6 +12,7 @@
  */
 import { Zap } from 'lucide-react';
 
+import { AdvisorCard } from '@/components/pulse/AdvisorCard';
 import { TrendingCard } from '@/components/pulse/TrendingCard';
 import { PriceWaterfallCard } from '@/components/pulse/PriceWaterfallCard';
 import { StockAlertsCard } from '@/components/pulse/StockAlertsCard';
@@ -58,6 +59,10 @@ export default async function DashboardPage() {
           <p className="mt-1 text-sm text-muted-foreground">
             Signals collected in the last 24 hours from the Kajota catalogue.
           </p>
+        </div>
+
+        <div className="mb-6">
+          <AdvisorCard />
         </div>
 
         <div className="grid gap-6 md:grid-cols-2">

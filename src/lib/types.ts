@@ -76,3 +76,25 @@ export interface DashboardData {
   stockAlerts: StockAlert[];
   marginLeaderboard: MarginLeaderboardRow[];
 }
+
+/** A single "what to stock" call from the Gemini advisor. */
+export interface StockRecommendation {
+  /** Product (or category) the seller should stock. */
+  product: string;
+  /** The concrete move — e.g. "Stock 20 units this week". */
+  action: string;
+  /** One-line justification tying demand × margin × opportunity. */
+  reason: string;
+}
+
+/** Response of `POST /api/recommend` — the advisor's ranked buy-list. */
+export interface AdvisorResponse {
+  /** One-line summary of the week's opportunity. */
+  headline: string;
+  recommendations: StockRecommendation[];
+  /** Gemini model id, or 'heuristic' when the LLM is unavailable. */
+  model: string;
+  /** Whether the underlying signals came from live Aurora or the mock. */
+  source: 'aurora' | 'mock';
+  latencyMs: number;
+}
